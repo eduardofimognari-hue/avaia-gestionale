@@ -1,0 +1,392 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Azienda {
+  id     Int      @id @default(autoincrement())
+  nome   String   @unique
+  slug   String   @unique
+  attivo Boolean  @default(true)
+  creatoIl DateTime @default(now())
+
+  utenti                Utente[]
+  soci                  Soci[]
+  clienti               Clienti[]
+  prodotti              Prodotti[]
+  listinoPrezzi         ListinoPrezzi[]
+  movimentiInput        MovimentiInput[]
+  lavoroSoci            LavoroSoci[]
+  tariffeLavoro         TariffeLavoro[]
+  produzioniInput       ProduzioniInput[]
+  casseInterne          CasseInterne[]
+  movimentiCassa        MovimentiCassa[]
+  movimentiSoci         MovimentiSoci[]
+  liquidazioniSoci      LiquidazioniSoci[]
+  debitiAperti          DebitiAperti[]
+  vendite               Vendite[]
+  aree                  Aree[]
+  luoghi                Luoghi[]
+  ruoli                 Ruoli[]
+  regoleRipartizione    RegoleRipartizione[]
+  parametriCostoLavoro  ParametriCostoLavoro[]
+}
+
+model Ruoli {
+  id     Int         @id @default(autoincrement())
+  nome   String
+  attivo Boolean     @default(true)
+  soci   SociRuoli[]
+  aziendaId Int
+  azienda   Azienda @relation(fields: [aziendaId], references: [id])
+  @@unique([nome, aziendaId])
+}
+
+model SociRuoli {
+  socioId Int
+  socio   Soci  @relation(fields: [socioId], references: [id], onDelete: Cascade)
+  ruoloId Int
+  ruolo   Ruoli @relation(fields: [ruoloId], references: [id], onDelete: Cascade)
+  @@id([socioId, ruoloId])
+}
+
+model SociAreeResponsabilita {
+  socioId Int
+  socio   Soci @relation(fields: [socioId], references: [id], onDelete: Cascade)
+  areaId  Int
+  area    Aree @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  @@id([socioId, areaId])
+}
+
+model Utente {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  nome      String
+  password  String
+  ruolo     String   @default("utente")
+  attivo    Boolean  @default(true)
+  creatoIl  DateTime @default(now())
+  aziendaId Int
+  azienda   Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model Soci {
+  id             Int         @id @default(autoincrement())
+  nome           String
+  cognome        String
+  codiceFiscale  String?
+  telefono       String?
+  email          String?
+  indirizzo      String?
+  dataIngresso   DateTime?
+  dataUscita     DateTime?
+  attivo         Boolean     @default(true)
+  note           String?
+  creatoIl       DateTime    @default(now())
+  aziendaId      Int
+  azienda        Azienda     @relation(fields: [aziendaId], references: [id])
+  lavori         LavoroSoci[]
+  movimentiSoci  MovimentiSoci[]
+  liquidazioni   LiquidazioniSoci[]
+  tariffe        TariffeLavoro[]
+  responsabilita SociAreeResponsabilita[]
+  ruoli          SociRuoli[]
+}
+
+model Aree {
+  id          Int         @id @default(autoincrement())
+  nome        String
+  descrizione String?
+  attivo      Boolean     @default(true)
+  creatoIl    DateTime    @default(now())
+  aziendaId   Int
+  azienda     Azienda     @relation(fields: [aziendaId], references: [id])
+  lavori      LavoroSoci[]
+  tariffe     TariffeLavoro[]
+  responsabili SociAreeResponsabilita[]
+  @@unique([nome, aziendaId])
+}
+
+model Luoghi {
+  id          Int                   @id @default(autoincrement())
+  nome        String
+  indirizzo   String?
+  comune      String?
+  provincia   String?
+  cap         String?
+  tipo        String                @default("fisico")
+  note        String?
+  attivo      Boolean               @default(true)
+  creatoIl    DateTime              @default(now())
+  aziendaId   Int
+  azienda     Azienda               @relation(fields: [aziendaId], references: [id])
+  movimenti   MovimentiCassa[]
+  ripartizioneSorgente  RegoleRipartizione[] @relation("Sorgente")
+  ripartizioneDestinazione RegoleRipartizione[] @relation("Destinazione")
+  lavoriSoci  LavoroSoci[]
+}
+
+model Clienti {
+  id            Int         @id @default(autoincrement())
+  nome          String
+  cognome       String?
+  ragioneSociale String?
+  tipo          String      @default("Privato")
+  codiceFiscale String?
+  partitaIva    String?
+  telefono      String?
+  email         String?
+  indirizzo     String?
+  comune        String?
+  provincia     String?
+  cap           String?
+  note          String?
+  attivo        Boolean     @default(true)
+  creatoIl      DateTime    @default(now())
+  aziendaId     Int
+  azienda       Azienda     @relation(fields: [aziendaId], references: [id])
+  debiti        DebitiAperti[]
+  vendite       Vendite[]
+}
+
+model Prodotti {
+  id              Int            @id @default(autoincrement())
+  codice          String         @unique
+  nome            String
+  varietaTipologia String?
+  categoria       String?
+  tipo            String         @default("prodotto")
+  unitaMisura     String         @default("kg")
+  attivo          Boolean        @default(true)
+  note            String?
+  creatoIl        DateTime       @default(now())
+  aziendaId       Int
+  azienda         Azienda        @relation(fields: [aziendaId], references: [id])
+  listino         ListinoPrezzi[]
+  movimenti       MovimentiInput[]
+  produzioni      ProduzioniInput[]
+  righeVendita    RigheVendita[]
+}
+
+model ListinoPrezzi {
+  id           Int      @id @default(autoincrement())
+  anno         Int
+  prodottoId   Int
+  prodotto     Prodotti @relation(fields: [prodottoId], references: [id])
+  tipoCliente  String
+  formato      String
+  unitaMisura  String
+  prezzoBase   Float
+  dataInizio   DateTime?
+  dataFine     DateTime?
+  attivo       Boolean  @default(true)
+  note         String?
+  creatoIl     DateTime @default(now())
+  aziendaId    Int
+  azienda      Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model ParametriCostoLavoro {
+  id          Int      @id @default(autoincrement())
+  anno        Int
+  oraInizio   DateTime?
+  oraFine     DateTime?
+  costoOrario Float?
+  descrizione String?
+  attivo      Boolean  @default(true)
+  creatoIl    DateTime @default(now())
+  aziendaId   Int
+  azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model MovimentiInput {
+  id              Int      @id @default(autoincrement())
+  data            DateTime
+  prodottoId      Int
+  prodotto        Prodotti @relation(fields: [prodottoId], references: [id])
+  tipo            String
+  quantita        Float
+  unitaMisura     String
+  note            String?
+  creatoIl        DateTime @default(now())
+  aziendaId       Int
+  azienda         Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model LavoroSoci {
+  id          Int      @id @default(autoincrement())
+  data        DateTime
+  socioId     Int
+  socio       Soci     @relation(fields: [socioId], references: [id])
+  areaId      Int?
+  area        Aree?    @relation(fields: [areaId], references: [id])
+  luogoId     Int?
+  luogo       Luoghi?  @relation(fields: [luogoId], references: [id])
+  ore         Float
+  costoOrario Float    @default(10)
+  oraInizio   DateTime?
+  oraFine     DateTime?
+  descrizione String?
+  liquidato   Boolean  @default(false)
+  creatoIl    DateTime @default(now())
+  aziendaId   Int
+  azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model TariffeLavoro {
+  id          Int      @id @default(autoincrement())
+  socioId     Int
+  socio       Soci     @relation(fields: [socioId], references: [id])
+  areaId      Int
+  area        Aree     @relation(fields: [areaId], references: [id])
+  costoOrario Float
+  anno        Int
+  attivo      Boolean  @default(true)
+  creatoIl    DateTime @default(now())
+  aziendaId   Int
+  azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+  @@unique([socioId, areaId, anno, aziendaId])
+}
+
+model ProduzioniInput {
+  id              Int      @id @default(autoincrement())
+  data            DateTime
+  prodottoId      Int
+  prodotto        Prodotti @relation(fields: [prodottoId], references: [id])
+  quantitaProdtta Float
+  unitaMisura     String
+  note            String?
+  creatoIl        DateTime @default(now())
+  aziendaId       Int
+  azienda         Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model CasseInterne {
+  id          Int              @id @default(autoincrement())
+  nome        String
+  saldoIniziale Float          @default(0)
+  attivo      Boolean          @default(true)
+  note        String?
+  creatoIl    DateTime         @default(now())
+  aziendaId   Int
+  azienda     Azienda          @relation(fields: [aziendaId], references: [id])
+  movimenti   MovimentiCassa[]
+  @@unique([nome, aziendaId])
+}
+
+model MovimentiCassa {
+  id          Int      @id @default(autoincrement())
+  data        DateTime
+  cassaId     Int
+  cassa       CasseInterne @relation(fields: [cassaId], references: [id])
+  luogoId     Int?
+  luogo       Luoghi?  @relation(fields: [luogoId], references: [id])
+  tipo        String
+  importo     Float
+  categoria   String?
+  descrizione String?
+  riferimento String?
+  creatoIl    DateTime @default(now())
+  aziendaId   Int
+  azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model MovimentiSoci {
+  id              Int      @id @default(autoincrement())
+  data            DateTime
+  socioId         Int
+  socio           Soci     @relation(fields: [socioId], references: [id])
+  tipo            String
+  importo         Float
+  categoria       String?
+  descrizione     String?
+  liquidato       Boolean  @default(false)
+  liquidazioneId  Int?
+  liquidazione    LiquidazioniSoci? @relation(fields: [liquidazioneId], references: [id])
+  creatoIl        DateTime @default(now())
+  aziendaId       Int
+  azienda         Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model LiquidazioniSoci {
+  id            Int      @id @default(autoincrement())
+  data          DateTime
+  socioId       Int
+  socio         Soci     @relation(fields: [socioId], references: [id])
+  totaleCrediti Float    @default(0)
+  totaleDebiti  Float    @default(0)
+  importoNetto  Float    @default(0)
+  periodoDa     DateTime?
+  periodoA      DateTime?
+  stato         String   @default("da pagare")
+  dataPagamento DateTime?
+  note          String?
+  creatoIl      DateTime @default(now())
+  aziendaId     Int
+  azienda       Azienda  @relation(fields: [aziendaId], references: [id])
+  movimenti     MovimentiSoci[]
+}
+
+model DebitiAperti {
+  id          Int      @id @default(autoincrement())
+  data        DateTime
+  clienteId   Int?
+  cliente     Clienti? @relation(fields: [clienteId], references: [id])
+  importo     Float
+  descrizione String?
+  scadenza    DateTime?
+  stato       String   @default("aperto")
+  dataSaldo   DateTime?
+  venditaId   Int?
+  vendita     Vendite? @relation(fields: [venditaId], references: [id])
+  note        String?
+  creatoIl    DateTime @default(now())
+  aziendaId   Int
+  azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model RegoleRipartizione {
+  id                    Int      @id @default(autoincrement())
+  luogoSorgenteId       Int
+  luogoSorgente         Luoghi   @relation("Sorgente", fields: [luogoSorgenteId], references: [id])
+  luogoDestinazioneId   Int
+  luogoDestinazione     Luoghi   @relation("Destinazione", fields: [luogoDestinazioneId], references: [id])
+  percentuale           Float
+  anno                  Int
+  attivo                Boolean  @default(true)
+  creatoIl              DateTime @default(now())
+  aziendaId             Int
+  azienda               Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model Vendite {
+  id          Int      @id @default(autoincrement())
+  data        DateTime
+  clienteId   Int?
+  cliente     Clienti? @relation(fields: [clienteId], references: [id])
+  tipoCliente String
+  importoTotale Float?
+  nota        String?
+  creatoIl    DateTime @default(now())
+  aziendaId   Int
+  azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+  righe       RigheVendita[]
+  debiti      DebitiAperti[]
+}
+
+model RigheVendita {
+  id          Int      @id @default(autoincrement())
+  venditaId   Int
+  vendita     Vendite  @relation(fields: [venditaId], references: [id], onDelete: Cascade)
+  prodottoId  Int
+  prodotto    Prodotti @relation(fields: [prodottoId], references: [id])
+  formato     String?
+  quantita    Float
+  prezzoUnitario Float
+  importo     Float
+  creatoIl    DateTime @default(now())
+}
