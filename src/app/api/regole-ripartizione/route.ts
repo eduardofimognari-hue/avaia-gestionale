@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentAziendaId } from '@/lib/azienda-context'
+import { requireRole } from '@/lib/auth'
+import { regoleRipartizioneSchema } from '@/lib/validations'
+import { ZodError } from 'zod'
 
 export async function GET() {
   try {
@@ -24,15 +27,20 @@ export async function POST(request: Request) {
   try {
     const aziendaId = await getCurrentAziendaId()
     if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const body = await request.json()
-    const { luogoSorgenteId, luogoDestinazioneId, percentuale, anno } = body
+    const check = await requireRole(['admin', 'editor'], aziendaId)
+    if (!check.allowed) return check.response!
 
-    if (!luogoSorgenteId || !luogoDestinazioneId || percentuale === undefined || !anno) {
-      return NextResponse.json({ error: 'Campi obbligatori: luogoSorgenteId, luogoDestinazioneId, percentuale, anno' }, { status: 400 })
-    }
+    const body = await request.json()
+    const parsed = regoleRipartizioneSchema.parse(body)
 
     const regola = await prisma.regoleRipartizione.create({
-      data: { luogoSorgenteId, luogoDestinazioneId, percentuale, anno, aziendaId },
+      data: {
+        luogoSorgenteId: parsed.luogoSorgenteId,
+        luogoDestinazioneId: parsed.luogoDestinazioneId,
+        percentuale: parsed.percentuale,
+        anno: parsed.anno,
+        aziendaId,
+      },
       include: {
         luogoSorgente: { select: { id: true, nome: true } },
         luogoDestinazione: { select: { id: true, nome: true } },
@@ -40,7 +48,10 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(regola, { status: 201 })
-  } catch {
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.errors.map(e => e.message).join(', ') }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Errore nella creazione regola ripartizione' }, { status: 500 })
   }
 }

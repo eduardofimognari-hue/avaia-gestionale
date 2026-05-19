@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentAziendaId } from '@/lib/azienda-context'
+import { requireRole } from '@/lib/auth'
+import { sociSchema } from '@/lib/validations'
+import { ZodError } from 'zod'
 
 export async function GET() {
   try {
@@ -24,28 +27,27 @@ export async function POST(request: Request) {
   try {
     const aziendaId = await getCurrentAziendaId()
     if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const body = await request.json()
-    const { nome, cognome, codiceFiscale, telefono, email, indirizzo, dataIngresso, dataUscita, note, responsabilita, ruoli: ruoloIds } = body
+    const check = await requireRole(['admin', 'editor'], aziendaId)
+    if (!check.allowed) return check.response!
 
-    if (!nome || !cognome) {
-      return NextResponse.json({ error: 'I campi nome e cognome sono obbligatori' }, { status: 400 })
-    }
+    const body = await request.json()
+    const parsed = sociSchema.parse(body)
 
     const socio = await prisma.soci.create({
       data: {
-        nome, cognome, aziendaId,
-        codiceFiscale: codiceFiscale || null,
-        telefono: telefono || null,
-        email: email || null,
-        indirizzo: indirizzo || null,
-        dataIngresso: dataIngresso ? new Date(dataIngresso) : null,
-        dataUscita: dataUscita ? new Date(dataUscita) : null,
-        note: note ?? null,
-        responsabilita: responsabilita?.length
-          ? { create: responsabilita.map((areaId: number) => ({ areaId })) }
+        nome: parsed.nome, cognome: parsed.cognome, aziendaId,
+        codiceFiscale: parsed.codiceFiscale || null,
+        telefono: parsed.telefono || null,
+        email: parsed.email || null,
+        indirizzo: parsed.indirizzo || null,
+        dataIngresso: parsed.dataIngresso ? new Date(parsed.dataIngresso) : null,
+        dataUscita: parsed.dataUscita ? new Date(parsed.dataUscita) : null,
+        note: parsed.note ?? null,
+        responsabilita: parsed.responsabilita?.length
+          ? { create: parsed.responsabilita.map((areaId: number) => ({ areaId })) }
           : undefined,
-        ruoli: ruoloIds?.length
-          ? { create: ruoloIds.map((ruoloId: number) => ({ ruoloId })) }
+        ruoli: parsed.ruoli?.length
+          ? { create: parsed.ruoli.map((ruoloId: number) => ({ ruoloId })) }
           : undefined,
       },
       include: {
@@ -56,6 +58,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(socio, { status: 201 })
   } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.errors.map(e => e.message).join(', ') }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Errore nella creazione del socio' }, { status: 500 })
   }
 }

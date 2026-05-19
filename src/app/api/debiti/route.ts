@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentAziendaId } from '@/lib/azienda-context'
+import { requireRole } from '@/lib/auth'
+import { debitiSchema } from '@/lib/validations'
+import { ZodError } from 'zod'
 
 export async function GET() {
   try {
@@ -21,28 +24,30 @@ export async function POST(request: Request) {
   try {
     const aziendaId = await getCurrentAziendaId()
     if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const body = await request.json()
-    const { data, clienteId, importo, descrizione, scadenza, venditaId, note } = body
+    const check = await requireRole(['admin', 'editor'], aziendaId)
+    if (!check.allowed) return check.response!
 
-    if (!importo) {
-      return NextResponse.json({ error: 'Il campo importo è obbligatorio' }, { status: 400 })
-    }
+    const body = await request.json()
+    const parsed = debitiSchema.parse(body)
 
     const debito = await prisma.debitiAperti.create({
       data: {
-        data: data ? new Date(data) : new Date(), aziendaId,
-        clienteId: clienteId ?? null,
-        importo,
-        descrizione: descrizione ?? null,
-        scadenza: scadenza ? new Date(scadenza) : null,
-        venditaId: venditaId ?? null,
-        note: note ?? null,
+        data: parsed.data ? new Date(parsed.data) : new Date(), aziendaId,
+        clienteId: parsed.clienteId ?? null,
+        importo: parsed.importo,
+        descrizione: parsed.descrizione ?? null,
+        scadenza: parsed.scadenza ? new Date(parsed.scadenza) : null,
+        venditaId: parsed.venditaId ?? null,
+        note: parsed.note ?? null,
       },
       include: { cliente: true, vendita: { select: { id: true, importoTotale: true } } },
     })
 
     return NextResponse.json(debito, { status: 201 })
   } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.errors.map(e => e.message).join(', ') }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Errore nella creazione del debito' }, { status: 500 })
   }
 }

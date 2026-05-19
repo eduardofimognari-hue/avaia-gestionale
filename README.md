@@ -30,14 +30,14 @@ Apri [http://localhost:3000](http://localhost:3000).
 
 ## Credenziali di default
 
-- **Email:** admin@kairos.it
-- **Password:** admin123
+- **Admin:** admin@avaia.it / avaia-demo
+- **Editor:** editor@avaia.it / editor-demo
 
 ## Tecnologie
 
 - **Next.js 14** (App Router, React Server Components)
 - **TypeScript**
-- **Prisma** + SQLite
+- **Prisma** + PostgreSQL (Neon)
 - **Tailwind CSS**
 - **NextAuth.js**
 - **Recharts**

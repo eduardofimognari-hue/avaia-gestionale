@@ -1,33 +1,35 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentAziendaId } from '@/lib/azienda-context'
+import { requireRole } from '@/lib/auth'
+import { venditaNuovaSchema } from '@/lib/validations'
+import { ZodError } from 'zod'
 
 export async function POST(request: Request) {
   try {
     const aziendaId = await getCurrentAziendaId()
     if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const body = await request.json()
-    const { data, clienteId, tipoCliente, righe } = body
+    const check = await requireRole(['admin', 'editor'], aziendaId)
+    if (!check.allowed) return check.response!
 
-    if (!data || !tipoCliente || !righe || !Array.isArray(righe) || righe.length === 0) {
-      return NextResponse.json({ error: 'Campi obbligatori mancanti: data, tipoCliente, righe (array non vuoto)' }, { status: 400 })
-    }
+    const body = await request.json()
+    const parsed = venditaNuovaSchema.parse(body)
 
     const result = await prisma.$transaction(async (tx) => {
-      const importoTotale = righe.reduce((sum: number, r: { quantita: number; prezzoUnitario: number }) => {
+      const importoTotale = parsed.righe.reduce((sum: number, r: { quantita: number; prezzoUnitario: number }) => {
         return sum + r.quantita * r.prezzoUnitario
       }, 0)
 
       const vendita = await tx.vendite.create({
         data: {
-          data: new Date(data), aziendaId,
-          clienteId: clienteId ?? null,
-          tipoCliente,
+          data: new Date(parsed.data), aziendaId,
+          clienteId: parsed.clienteId ?? null,
+          tipoCliente: parsed.tipoCliente,
           importoTotale,
         },
       })
 
-      for (const r of righe) {
+      for (const r of parsed.righe) {
         await tx.righeVendita.create({
           data: {
             venditaId: vendita.id,
@@ -42,7 +44,7 @@ export async function POST(request: Request) {
         if (prod && prod.tipo === 'prodotto') {
           await tx.movimentiInput.create({
             data: {
-              data: new Date(data), aziendaId,
+              data: new Date(parsed.data), aziendaId,
               prodottoId: r.prodottoId,
               tipo: 'vendita',
               quantita: r.quantita,
@@ -61,6 +63,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.errors.map(e => e.message).join(', ') }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Errore nella creazione della vendita' }, { status: 500 })
   }
 }

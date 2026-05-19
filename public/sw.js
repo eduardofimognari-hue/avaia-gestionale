@@ -1,6 +1,6 @@
-const CACHE = 'avaia-v2'
-const STATIC_CACHE = 'avaia-static-v2'
-const API_CACHE = 'avaia-api-v2'
+const CACHE_VERSION = 'v3'
+const STATIC_CACHE = `avaia-static-${CACHE_VERSION}`
+const API_CACHE = `avaia-api-${CACHE_VERSION}`
 
 const staticUrls = [
   '/',
@@ -30,7 +30,11 @@ self.addEventListener('activate', (e) => {
     Promise.all([
       clients.claim(),
       caches.keys().then((keys) =>
-        Promise.all(keys.filter((k) => k !== STATIC_CACHE && k !== API_CACHE).map((k) => caches.delete(k))),
+        Promise.all(
+          keys
+            .filter((k) => k !== STATIC_CACHE && k !== API_CACHE)
+            .map((k) => caches.delete(k))
+        ),
       ),
     ]),
   )
@@ -40,18 +44,27 @@ self.addEventListener('fetch', (e) => {
   const { request } = e
   const url = new URL(request.url)
 
-  // API calls - network first, cache fallback
+  // API calls - stale-while-revalidate
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(
-      fetch(request)
-        .then((res) => {
-          if (res.ok) {
-            const clone = res.clone()
-            caches.open(API_CACHE).then((c) => c.put(request, clone))
-          }
-          return res
-        })
-        .catch(() => caches.match(request).then((r) => r || new Response(JSON.stringify({ error: 'offline' }), { status: 503, headers: { 'Content-Type': 'application/json' } }))),
+      caches.open(API_CACHE).then((cache) =>
+        cache.match(request).then((cached) => {
+          const fetchPromise = fetch(request).then((res) => {
+            if (res.ok) {
+              cache.put(request, res.clone())
+            }
+            return res
+          }).catch(() => cached)
+          return cached || fetchPromise
+        }).catch(() =>
+          fetch(request).catch(() =>
+            new Response(JSON.stringify({ error: 'offline' }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          )
+        ),
+      ),
     )
     return
   }

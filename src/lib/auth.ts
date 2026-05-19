@@ -4,6 +4,17 @@ import { prisma } from './db'
 import bcrypt from 'bcryptjs'
 import { NextResponse } from 'next/server'
 
+export type RuoloUtente = 'admin' | 'editor'
+
+export interface UtenteSessione {
+  id: number
+  email: string
+  nome: string
+  ruolo: string
+  attivo: boolean
+  aziendaId: number
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -30,21 +41,21 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.aziendaId = (user as any).aziendaId
-        token.ruolo = (user as any).ruolo
+        token.aziendaId = user.aziendaId
+        token.ruolo = user.ruolo
       }
       return token
     },
     async session({ session, token }) {
-      (session as any).aziendaId = token.aziendaId
-      ;(session as any).ruolo = token.ruolo
+      session.aziendaId = token.aziendaId
+      session.ruolo = token.ruolo
       return session
     },
   },
 }
 
-export async function getCurrentUser() {
-  const session = await getServerSession(authOptions) as any
+export async function getCurrentUser(): Promise<UtenteSessione | null> {
+  const session = await getServerSession(authOptions)
   if (!session?.user?.email) return null
   const utente = await prisma.utente.findUnique({
     where: { email: session.user.email },
@@ -53,15 +64,20 @@ export async function getCurrentUser() {
   return utente
 }
 
-export function requireRole(ruoli: string[]) {
-  return async function checkRole(resource?: string) {
-    const utente = await getCurrentUser()
-    if (!utente || !utente.attivo) {
-      return { allowed: false, response: NextResponse.json({ error: 'Non autorizzato' }, { status: 401 }) }
-    }
-    if (!ruoli.includes(utente.ruolo)) {
-      return { allowed: false, response: NextResponse.json({ error: 'Permessi insufficienti' }, { status: 403 }) }
-    }
-    return { allowed: true, response: null as NextResponse | null }
+export async function requireRole(ruoli: string[], aziendaId?: number) {
+  const utente = await getCurrentUser()
+  if (!utente || !utente.attivo) {
+    return { allowed: false, response: NextResponse.json({ error: 'Non autorizzato' }, { status: 401 }) }
   }
+  if (!ruoli.includes(utente.ruolo)) {
+    return { allowed: false, response: NextResponse.json({ error: 'Permessi insufficienti' }, { status: 403 }) }
+  }
+  if (aziendaId !== undefined && utente.aziendaId !== aziendaId) {
+    return { allowed: false, response: NextResponse.json({ error: 'Non autorizzato per questa azienda' }, { status: 403 }) }
+  }
+  return { allowed: true, response: null as NextResponse | null, utente }
+}
+
+export function checkRuoloScrittura(ruolo: string): boolean {
+  return ['admin', 'editor'].includes(ruolo)
 }

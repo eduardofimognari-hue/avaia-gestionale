@@ -75,12 +75,18 @@ export default function NuovaVenditaPage() {
   function aggiungiRiga() { setRighe([...righe, { prodottoId: 0, prodottoNome: '', formato: 'kg', quantita: 1, prezzoUnitario: 0, disponibile: 0 }]) }
   function rimuoviRiga(idx: number) { if (righe.length > 1) setRighe(righe.filter((_, i) => i !== idx)) }
 
-  async function aggiornaRiga(idx: number, field: keyof Riga, value: any) {
+  async function aggiornaRiga(idx: number, field: keyof Riga, value: string | number) {
     const righe2 = [...righe]
-    ;(righe2[idx] as any)[field] = value
-    if (field === 'formato' && righe2[idx].prodottoId) {
-      const prezzo = await cercaPrezzo(righe2[idx].prodottoId, value, tipoCliente)
-      righe2[idx].prezzoUnitario = prezzo
+    const r = righe2[idx]
+    if (field === 'prodottoId') r.prodottoId = Number(value)
+    else if (field === 'prodottoNome') r.prodottoNome = String(value)
+    else if (field === 'formato') r.formato = String(value)
+    else if (field === 'quantita') r.quantita = Number(value)
+    else if (field === 'prezzoUnitario') r.prezzoUnitario = Number(value)
+    else if (field === 'disponibile') r.disponibile = Number(value)
+    if (field === 'formato' && r.prodottoId) {
+      const prezzo = await cercaPrezzo(r.prodottoId, r.formato, tipoCliente)
+      r.prezzoUnitario = prezzo
     }
     setRighe([...righe2])
   }

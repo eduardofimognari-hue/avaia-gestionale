@@ -1,16 +1,22 @@
 import { cookies } from 'next/headers'
 import { getServerSession } from 'next-auth'
-import { authOptions } from './auth'
+import { authOptions, getCurrentUser } from './auth'
 import { prisma } from './db'
 
 export async function getCurrentAziendaId(): Promise<number | null> {
   const cookieStore = await cookies()
   const id = cookieStore.get('aziendaId')?.value
-  if (id) return parseInt(id)
+  if (id) {
+    const aziendaId = parseInt(id)
+    const utente = await getCurrentUser()
+    if (utente && utente.aziendaId !== aziendaId) {
+      return utente.aziendaId
+    }
+    return aziendaId
+  }
 
   const session = await getServerSession(authOptions)
-  const sessionAziendaId = (session as any)?.aziendaId
-  if (sessionAziendaId) return sessionAziendaId
+  if (session?.aziendaId) return session.aziendaId
 
   const first = await prisma.azienda.findFirst({ where: { attivo: true }, orderBy: { id: 'asc' } })
   return first?.id ?? null

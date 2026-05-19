@@ -81,7 +81,7 @@ export default function LuoghiPage() {
                 {data.map((l) => (
                   <Tr key={l.id}>
                     <Td className="font-medium">{l.nome}</Td>
-                    <Td><Badge variant={tipoBadge(l.tipo) as any}>{l.tipo}</Badge></Td>
+                    <Td><Badge variant={tipoBadge(l.tipo) as 'default' | 'success' | 'warning' | 'danger' | 'info'}>{l.tipo}</Badge></Td>
                     <Td>{l.indirizzo || '-'}</Td>
                     <Td>{l.comune || '-'}</Td>
                     <Td>{l.provincia || '-'}</Td>

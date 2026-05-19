@@ -1,6 +1,6 @@
 'use client'
 import { cn } from '@/lib/utils'
-import { Package, Users, Euro, ShoppingCart, Warehouse, Hammer, PiggyBank, AlertTriangle, LayoutDashboard, LogOut, X, Menu, ArrowLeftRight, Receipt, Shield } from 'lucide-react'
+import { Package, Users, Euro, ShoppingCart, Warehouse, Hammer, Landmark, AlertTriangle, LayoutDashboard, LogOut, X, Menu, ArrowLeftRight, Receipt, Shield, Sprout, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -13,8 +13,8 @@ interface SidebarProps {
 const mainItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
   { label: 'Vendite', icon: ShoppingCart, href: '/vendite' },
+  { label: 'Contabilità', icon: Landmark, href: '/contabilita' },
   { label: 'Anagrafiche', icon: Users, href: '/anagrafiche' },
-  { label: 'Listino', icon: Euro, href: '/listino' },
 ]
 
 const allItems = [
@@ -23,11 +23,13 @@ const allItems = [
   { label: 'Listino Prezzi', icon: Euro, href: '/listino' },
   { label: 'Vendite', icon: ShoppingCart, href: '/vendite' },
   { label: 'Magazzino', icon: Warehouse, href: '/magazzino' },
+  { label: 'Raccolta', icon: Sprout, href: '/raccolta' },
   { label: 'Lavoro Soci', icon: Hammer, href: '/lavoro-soci' },
-  { label: 'Cassa', icon: PiggyBank, href: '/cassa' },
+  { label: 'Contabilità', icon: Landmark, href: '/contabilita' },
   { label: 'Crediti / Debiti Soci', icon: ArrowLeftRight, href: '/movimenti-soci' },
   { label: 'Liquidazioni Soci', icon: Receipt, href: '/liquidazioni-soci' },
   { label: 'Debiti Clienti', icon: AlertTriangle, href: '/debiti' },
+  { label: 'DDT / Fatture', icon: FileText, href: '/documenti' },
 ]
 
 const adminItems = [

@@ -34,6 +34,8 @@ model Azienda {
   ruoli                 Ruoli[]
   regoleRipartizione    RegoleRipartizione[]
   parametriCostoLavoro  ParametriCostoLavoro[]
+  raccolte              Raccolta[]
+  documenti             Documenti[]
 }
 
 model Ruoli {
@@ -75,7 +77,7 @@ model Utente {
 }
 
 model Soci {
-  id             Int         @id @default(autoincrement())
+  id             Int              @id @default(autoincrement())
   nome           String
   cognome        String
   codiceFiscale  String?
@@ -84,14 +86,16 @@ model Soci {
   indirizzo      String?
   dataIngresso   DateTime?
   dataUscita     DateTime?
-  attivo         Boolean     @default(true)
+  attivo         Boolean          @default(true)
   note           String?
-  creatoIl       DateTime    @default(now())
+  creatoIl       DateTime         @default(now())
   aziendaId      Int
-  azienda        Azienda     @relation(fields: [aziendaId], references: [id])
+  azienda        Azienda          @relation(fields: [aziendaId], references: [id])
   lavori         LavoroSoci[]
   movimentiSoci  MovimentiSoci[]
+  movimentiCassa MovimentiCassa[]
   liquidazioni   LiquidazioniSoci[]
+  raccolte       Raccolta[]
   tariffe        TariffeLavoro[]
   responsabilita SociAreeResponsabilita[]
   ruoli          SociRuoli[]
@@ -128,6 +132,7 @@ model Luoghi {
   ripartizioneSorgente  RegoleRipartizione[] @relation("Sorgente")
   ripartizioneDestinazione RegoleRipartizione[] @relation("Destinazione")
   lavoriSoci  LavoroSoci[]
+  raccolte    Raccolta[]
 }
 
 model Clienti {
@@ -151,6 +156,7 @@ model Clienti {
   azienda       Azienda     @relation(fields: [aziendaId], references: [id])
   debiti        DebitiAperti[]
   vendite       Vendite[]
+  documenti     Documenti[]
 }
 
 model Prodotti {
@@ -170,6 +176,7 @@ model Prodotti {
   movimenti       MovimentiInput[]
   produzioni      ProduzioniInput[]
   righeVendita    RigheVendita[]
+  raccolte        Raccolta[]
 }
 
 model ListinoPrezzi {
@@ -198,6 +205,23 @@ model ParametriCostoLavoro {
   costoOrario Float?
   descrizione String?
   attivo      Boolean  @default(true)
+  creatoIl    DateTime @default(now())
+  aziendaId   Int
+  azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model Raccolta {
+  id          Int      @id @default(autoincrement())
+  data        DateTime
+  prodottoId  Int
+  prodotto    Prodotti @relation(fields: [prodottoId], references: [id])
+  quantita    Float
+  unitaMisura String   @default("kg")
+  luogoId     Int?
+  luogo       Luoghi?  @relation(fields: [luogoId], references: [id])
+  socioId     Int?
+  socio       Soci?    @relation(fields: [socioId], references: [id])
+  note        String?
   creatoIl    DateTime @default(now())
   aziendaId   Int
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
@@ -279,20 +303,23 @@ model CasseInterne {
 }
 
 model MovimentiCassa {
-  id          Int      @id @default(autoincrement())
-  data        DateTime
-  cassaId     Int
-  cassa       CasseInterne @relation(fields: [cassaId], references: [id])
-  luogoId     Int?
-  luogo       Luoghi?  @relation(fields: [luogoId], references: [id])
-  tipo        String
-  importo     Float
-  categoria   String?
-  descrizione String?
-  riferimento String?
-  creatoIl    DateTime @default(now())
-  aziendaId   Int
-  azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+  id            Int      @id @default(autoincrement())
+  data          DateTime
+  cassaId       Int
+  cassa         CasseInterne @relation(fields: [cassaId], references: [id])
+  luogoId       Int?
+  luogo         Luoghi?  @relation(fields: [luogoId], references: [id])
+  socioId       Int?
+  socio         Soci?    @relation(fields: [socioId], references: [id])
+  tipo          String
+  tipoMovimento String   @default("altro")
+  importo       Float
+  categoria     String?
+  descrizione   String?
+  riferimento   String?
+  creatoIl      DateTime @default(now())
+  aziendaId     Int
+  azienda       Azienda  @relation(fields: [aziendaId], references: [id])
 }
 
 model MovimentiSoci {
@@ -376,6 +403,25 @@ model Vendite {
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
   righe       RigheVendita[]
   debiti      DebitiAperti[]
+  documenti   Documenti[]
+}
+
+model Documenti {
+  id            Int      @id @default(autoincrement())
+  tipo          String
+  numero        Int
+  anno          Int
+  data          DateTime
+  venditaId     Int?
+  vendita       Vendite? @relation(fields: [venditaId], references: [id])
+  clienteId     Int?
+  cliente       Clienti? @relation(fields: [clienteId], references: [id])
+  importoTotale Float
+  note          String?
+  creatoIl      DateTime @default(now())
+  aziendaId     Int
+  azienda       Azienda  @relation(fields: [aziendaId], references: [id])
+  @@unique([tipo, numero, anno, aziendaId])
 }
 
 model RigheVendita {

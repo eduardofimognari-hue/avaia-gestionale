@@ -53,16 +53,9 @@ export default function MagazzinoPage() {
 
   async function fetchGiacenze() {
     try {
-      const res = await fetch('/api/prodotti')
-      const prods: Prodotto[] = await res.json()
-      const g: Giacenza[] = await Promise.all(
-        prods.map(async (p) => {
-          const r = await fetch(`/api/magazzino/giacenza?prodottoId=${p.id}`)
-          const d = await r.json()
-          return { prodottoId: p.id, nome: p.nome, varieta: p.varietaTipologia, giacenza: d.giacenza, unitaMisura: p.unitaMisura }
-        })
-      )
-      setGiacenze(g)
+      const res = await fetch('/api/magazzino/giacenze')
+      const data = await res.json()
+      setGiacenze(data.giacenze || [])
     } catch {}
   }
 

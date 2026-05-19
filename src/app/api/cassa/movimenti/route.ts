@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentAziendaId } from '@/lib/azienda-context'
+import { requireRole } from '@/lib/auth'
+import { cassaMovimentoSchema } from '@/lib/validations'
+import { ZodError } from 'zod'
 
 export async function GET() {
   try {
@@ -25,17 +28,22 @@ export async function POST(request: Request) {
   try {
     const aziendaId = await getCurrentAziendaId()
     if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
+    const check = await requireRole(['admin', 'editor'], aziendaId)
+    if (!check.allowed) return check.response!
+
     const body = await request.json()
+    const parsed = cassaMovimentoSchema.parse(body)
+
     const movimento = await prisma.movimentiCassa.create({
       data: {
-        data: body.data ? new Date(body.data) : new Date(),
-        cassaId: body.cassaId, aziendaId,
-        luogoId: body.luogoId ?? null,
-        tipo: body.tipo,
-        importo: body.importo,
-        categoria: body.categoria ?? null,
-        descrizione: body.descrizione ?? null,
-        riferimento: body.riferimento ?? null,
+        data: parsed.data ? new Date(parsed.data) : new Date(),
+        cassaId: parsed.cassaId, aziendaId,
+        luogoId: parsed.luogoId ?? null,
+        tipo: parsed.tipo,
+        importo: parsed.importo,
+        categoria: parsed.categoria ?? null,
+        descrizione: parsed.descrizione ?? null,
+        riferimento: parsed.riferimento ?? null,
       },
       include: {
         cassa: { select: { nome: true } },
@@ -43,7 +51,10 @@ export async function POST(request: Request) {
       },
     })
     return NextResponse.json(movimento, { status: 201 })
-  } catch {
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.errors.map(e => e.message).join(', ') }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Errore nella creazione movimento' }, { status: 500 })
   }
 }

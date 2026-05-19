@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 interface Utente {
@@ -17,7 +16,6 @@ interface Utente {
 }
 
 export default function UtentiPage() {
-  const router = useRouter()
   const [utenti, setUtenti] = useState<Utente[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -50,7 +48,6 @@ export default function UtentiPage() {
     }
     setShowForm(false)
     setForm({ email: '', nome: '', password: '', ruolo: 'editor' })
-    router.refresh()
     const data = await fetch('/api/utenti').then((r) => r.json())
     setUtenti(data)
   }

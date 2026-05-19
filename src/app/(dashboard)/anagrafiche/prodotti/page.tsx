@@ -28,7 +28,7 @@ export default function ProdottiPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ codice: '', nome: '', varietaTipologia: '', categoria: '', unitaMisura: 'kg', note: '' })
+  const [form, setForm] = useState({ codice: '', nome: '', tipo: 'prodotto', varietaTipologia: '', categoria: '', unitaMisura: 'kg', note: '' })
 
   async function fetchData() {
     try {
@@ -47,10 +47,10 @@ export default function ProdottiPage() {
     setSaving(true)
     try {
       const { codice, ...data } = form
-      const res = await fetch('/api/prodotti', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
-      if (!res.ok) throw new Error('Erroore salvataggio')
+      const res = await fetch('/api/prodotti', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, tipo: form.tipo }) })
+      if (!res.ok) throw new Error('Errore salvataggio')
       setModalOpen(false)
-      setForm({ codice: '', nome: '', varietaTipologia: '', categoria: '', unitaMisura: 'kg', note: '' })
+      setForm({ codice: '', nome: '', tipo: 'prodotto', varietaTipologia: '', categoria: '', unitaMisura: 'kg', note: '' })
       await fetchData()
     } catch { setError('Errore durante il salvataggio') }
     finally { setSaving(false) }
@@ -90,7 +90,15 @@ export default function ProdottiPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="text-sm font-medium block mb-1">Codice</label><Input value="Auto-generato" disabled className="text-gray-400" /></div>
           <div><label className="text-sm font-medium block mb-1">Nome</label><Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required /></div>
-          <div><label className="text-sm font-medium block mb-1">Varietà / Tipologia</label><Input value={form.varietaTipologia} onChange={(e) => setForm({ ...form, varietaTipologia: e.target.value })} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="text-sm font-medium block mb-1">Tipo</label>
+              <Select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+                <option value="prodotto">Prodotto finito</option>
+                <option value="materiale">Materia prima / materiale</option>
+              </Select>
+            </div>
+            <div><label className="text-sm font-medium block mb-1">Varietà / Tipologia</label><Input value={form.varietaTipologia} onChange={(e) => setForm({ ...form, varietaTipologia: e.target.value })} /></div>
+          </div>
           <div><label className="text-sm font-medium block mb-1">Categoria</label><Input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} /></div>
           <div><label className="text-sm font-medium block mb-1">Unità di Misura</label>
             <Select value={form.unitaMisura} onChange={(e) => setForm({ ...form, unitaMisura: e.target.value })}>

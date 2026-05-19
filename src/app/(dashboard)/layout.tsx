@@ -3,8 +3,8 @@ import { authOptions } from '@/lib/auth'
 import { Sidebar } from '@/components/layout/sidebar'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession(authOptions) as any
-  const ruolo = (session as any)?.ruolo ?? null
+  const session = await getServerSession(authOptions)
+  const ruolo = session?.ruolo ?? null
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">

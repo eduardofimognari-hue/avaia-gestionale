@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import bcrypt from 'bcryptjs'
+import { getCurrentAziendaId } from '@/lib/azienda-context'
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const check = await requireRole(['admin'])()
+  const aziendaId = await getCurrentAziendaId()
+  const check = await requireRole(['admin'], aziendaId ?? undefined)
   if (!check.allowed) return check.response!
 
   try {
@@ -32,7 +34,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const check = await requireRole(['admin'])()
+  const aziendaId = await getCurrentAziendaId()
+  const check = await requireRole(['admin'], aziendaId ?? undefined)
   if (!check.allowed) return check.response!
 
   try {

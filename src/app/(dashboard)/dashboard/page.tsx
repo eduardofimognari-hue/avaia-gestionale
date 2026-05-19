@@ -8,7 +8,7 @@ import { formatEuro, formatDate, formatNumber } from '@/lib/utils'
 import { redirect } from 'next/navigation'
 
 async function getStats(aziendaId: number) {
-  const [prodotti, clienti, soci, debiti, venditeMese, venditeMeseScorso, totaleVendite, debitiScaduti, movimentiCarico, movimentiScarico] = await Promise.all([
+  const [prodotti, clienti, soci, debiti, venditeMese, venditeMeseScorso, totaleVendite, debitiScaduti, movimentiCarico, movimentiScarico, entrateMese, usciteMese] = await Promise.all([
     prisma.prodotti.count({ where: { attivo: true, aziendaId } }),
     prisma.clienti.count({ where: { attivo: true, aziendaId } }),
     prisma.soci.count({ where: { attivo: true, aziendaId } }),
@@ -23,6 +23,8 @@ async function getStats(aziendaId: number) {
     }),
     prisma.movimentiInput.groupBy({ by: ['prodottoId'], where: { aziendaId, tipo: { in: ['carico', 'reso'] } }, _sum: { quantita: true } }),
     prisma.movimentiInput.groupBy({ by: ['prodottoId'], where: { aziendaId, tipo: { in: ['scarico', 'vendita'] } }, _sum: { quantita: true } }),
+    prisma.movimentiCassa.aggregate({ where: { aziendaId, tipo: 'entrata', data: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } }, _sum: { importo: true } }),
+    prisma.movimentiCassa.aggregate({ where: { aziendaId, tipo: 'uscita', data: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } }, _sum: { importo: true } }),
   ])
   const mese = venditeMese.reduce((a, v) => a + Number(v.importoTotale || 0), 0)
   const scorso = venditeMeseScorso.reduce((a, v) => a + Number(v.importoTotale || 0), 0)
@@ -30,15 +32,22 @@ async function getStats(aziendaId: number) {
   const caricoMap = new Map(movimentiCarico.map(m => [m.prodottoId, Number(m._sum.quantita || 0)]))
   const scaricoMap = new Map(movimentiScarico.map(m => [m.prodottoId, Number(m._sum.quantita || 0)]))
   const tuttiIds = Array.from(new Set([...Array.from(caricoMap.keys()), ...Array.from(scaricoMap.keys())]))
-  const prodottiScortaBassa = (await Promise.all(
-    tuttiIds.map(async (id) => {
-      const prod = await prisma.prodotti.findUnique({ where: { id } })
-      if (!prod || prod.tipo !== 'prodotto') return null
-      const giacenza = (caricoMap.get(id) || 0) - (scaricoMap.get(id) || 0)
-      if (giacenza <= 0) return { nome: prod.nome, varieta: prod.varietaTipologia, giacenza: Math.max(0, giacenza) }
-      return null
-    })
-  )).filter(Boolean)
+
+  const prodottiConId = tuttiIds.length > 0
+    ? await prisma.prodotti.findMany({
+        where: { id: { in: tuttiIds }, aziendaId, tipo: 'prodotto' },
+        select: { id: true, nome: true, varietaTipologia: true },
+      })
+    : []
+
+  const prodottiScortaBassa = prodottiConId.map((prod) => {
+    const giacenza = (caricoMap.get(prod.id) || 0) - (scaricoMap.get(prod.id) || 0)
+    if (giacenza <= 0) return { nome: prod.nome, varieta: prod.varietaTipologia, giacenza: Math.max(0, giacenza) }
+    return null
+  }).filter(Boolean)
+
+  const entrateMeseTot = Number(entrateMese._sum.importo || 0)
+  const usciteMeseTot = Number(usciteMese._sum.importo || 0)
 
   return {
     prodotti, clienti, soci,
@@ -46,9 +55,11 @@ async function getStats(aziendaId: number) {
     venditeMese: mese,
     venditeMeseScorso: scorso,
     totaleVendite: Number(totaleVendite._sum.importoTotale || 0),
-    trend: scorso > 0 ? ((mese - scorso) / scorso * 100).toFixed(1) : '0',
+    trend: scorso > 0 ? ((mese - scorso) / scorso * 100).toFixed(1) : (mese > 0 ? '100.0' : '0'),
     debitiScaduti,
     prodottiScortaBassa,
+    entrateMese: entrateMeseTot,
+    usciteMese: usciteMeseTot,
   }
 }
 
@@ -104,26 +115,52 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <Card className="mb-6">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Vendite {new Date().toLocaleString('it-IT', { month: 'long' })}</p>
-              <p className="text-3xl font-bold mt-1">{formatEuro(s.venditeMese)}</p>
-              <div className="flex items-center gap-1 mt-1">
-                {Number(s.trend) >= 0 ? <TrendingUp className="w-4 h-4 text-green-600" /> : <TrendingDown className="w-4 h-4 text-red-600" />}
-                <span className={`text-sm font-medium ${Number(s.trend) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {s.trend}% vs mese scorso
-                </span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <Card className="mb-0">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Vendite {new Date().toLocaleString('it-IT', { month: 'long' })}</p>
+                <p className="text-3xl font-bold mt-1">{formatEuro(s.venditeMese)}</p>
+                <div className="flex items-center gap-1 mt-1">
+                  {Number(s.trend) >= 0 ? <TrendingUp className="w-4 h-4 text-green-600" /> : <TrendingDown className="w-4 h-4 text-red-600" />}
+                  <span className={`text-sm font-medium ${Number(s.trend) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {s.trend}% vs mese scorso
+                  </span>
+                </div>
+              </div>
+              <div className="hidden sm:flex flex-col items-end gap-1">
+                <p className="text-xs text-gray-400">Totale annuale</p>
+                <p className="text-lg font-semibold">{formatEuro(s.totaleVendite)}</p>
               </div>
             </div>
-            <div className="hidden sm:flex flex-col items-end gap-1">
-              <p className="text-xs text-gray-400">Totale annuale</p>
-              <p className="text-lg font-semibold">{formatEuro(s.totaleVendite)}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-0">
+          <CardContent className="p-5">
+            <p className="text-sm text-gray-500 mb-2">Contabilità mensile</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-green-600 font-medium">Entrate</p>
+                <p className="text-xl font-bold text-green-700">{formatEuro(s.entrateMese)}</p>
+              </div>
+              <div className="text-gray-300 text-xl font-light">|</div>
+              <div>
+                <p className="text-xs text-red-600 font-medium">Uscite</p>
+                <p className="text-xl font-bold text-red-700">{formatEuro(s.usciteMese)}</p>
+              </div>
+              <div className="text-gray-300 text-xl font-light">|</div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Saldo</p>
+                <p className={`text-xl font-bold ${s.entrateMese - s.usciteMese >= 0 ? 'text-primary-700' : 'text-red-700'}`}>
+                  {formatEuro(s.entrateMese - s.usciteMese)}
+                </p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <Stat label="Prodotti" value={s.prodotti} icon={Package} color="text-blue-600" />

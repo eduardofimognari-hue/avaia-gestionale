@@ -123,11 +123,11 @@ async function main() {
   if (svLuogo && stLuogo && apiLuogo && kairosLuogo) {
     await prisma.movimentiCassa.createMany({
       data: [
-        { data: new Date('2026-01-10'), cassaId: cassaKairos.id, luogoId: svLuogo.id, tipo: 'entrata', importo: 2000.00, categoria: 'Vendite', aziendaId: azienda.id },
-        { data: new Date('2026-01-15'), cassaId: cassaKairos.id, luogoId: stLuogo.id, tipo: 'entrata', importo: 1500.00, categoria: 'Vendite', aziendaId: azienda.id },
-        { data: new Date('2026-01-20'), cassaId: cassaKairos.id, luogoId: apiLuogo.id, tipo: 'entrata', importo: 800.00, categoria: 'Vendite', aziendaId: azienda.id },
-        { data: new Date('2026-02-01'), cassaId: cassaKairos.id, luogoId: kairosLuogo.id, tipo: 'uscita', importo: 300.00, categoria: 'Spese', aziendaId: azienda.id },
-        { data: new Date('2026-02-05'), cassaId: cassaKairos.id, luogoId: svLuogo.id, tipo: 'uscita', importo: 150.00, categoria: 'Manutenzione', aziendaId: azienda.id },
+        { data: new Date('2026-01-10'), cassaId: cassaKairos.id, luogoId: svLuogo.id, tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: 2000.00, categoria: 'Vendite', aziendaId: azienda.id },
+        { data: new Date('2026-01-15'), cassaId: cassaKairos.id, luogoId: stLuogo.id, tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: 1500.00, categoria: 'Vendite', aziendaId: azienda.id },
+        { data: new Date('2026-01-20'), cassaId: cassaKairos.id, luogoId: apiLuogo.id, tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: 800.00, categoria: 'Vendite', aziendaId: azienda.id },
+        { data: new Date('2026-02-01'), cassaId: cassaKairos.id, luogoId: kairosLuogo.id, tipo: 'uscita', tipoMovimento: 'spesa', importo: 300.00, categoria: 'Spese', aziendaId: azienda.id },
+        { data: new Date('2026-02-05'), cassaId: cassaKairos.id, luogoId: svLuogo.id, tipo: 'uscita', tipoMovimento: 'spesa', importo: 150.00, categoria: 'Manutenzione', aziendaId: azienda.id },
       ],
     })
   }

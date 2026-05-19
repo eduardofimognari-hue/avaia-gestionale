@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getCurrentAziendaId } from '@/lib/azienda-context'
+import { requireRole } from '@/lib/auth'
+import { prodottiSchema } from '@/lib/validations'
+import { ZodError } from 'zod'
 
 export async function GET() {
   try {
@@ -20,12 +23,11 @@ export async function POST(request: Request) {
   try {
     const aziendaId = await getCurrentAziendaId()
     if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const body = await request.json()
-    const { nome, varietaTipologia, categoria, unitaMisura, note } = body
+    const check = await requireRole(['admin', 'editor'], aziendaId)
+    if (!check.allowed) return check.response!
 
-    if (!nome) {
-      return NextResponse.json({ error: 'Il campo nome è obbligatorio' }, { status: 400 })
-    }
+    const body = await request.json()
+    const parsed = prodottiSchema.parse(body)
 
     const maxId = await prisma.prodotti.aggregate({ _max: { id: true } })
     const nextId = (maxId._max.id ?? 0) + 1
@@ -33,16 +35,20 @@ export async function POST(request: Request) {
 
     const prodotto = await prisma.prodotti.create({
       data: {
-        codice, nome, aziendaId,
-        varietaTipologia: varietaTipologia ?? null,
-        categoria: categoria ?? null,
-        unitaMisura: unitaMisura ?? 'kg',
-        note: note ?? null,
+        codice, nome: parsed.nome, aziendaId,
+        varietaTipologia: parsed.varietaTipologia ?? null,
+        categoria: parsed.categoria ?? null,
+        tipo: parsed.tipo ?? 'prodotto',
+        unitaMisura: parsed.unitaMisura ?? 'kg',
+        note: parsed.note ?? null,
       },
     })
 
     return NextResponse.json(prodotto, { status: 201 })
   } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.errors.map(e => e.message).join(', ') }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Errore nella creazione del prodotto' }, { status: 500 })
   }
 }
