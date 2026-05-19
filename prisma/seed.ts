@@ -11,12 +11,12 @@ async function main() {
 
   const adminPassword = await bcrypt.hash('avaia-demo', 10)
   await prisma.utente.create({
-    data: { email: 'admin@kairos.it', nome: 'Admin', password: adminPassword, ruolo: 'admin', aziendaId: azienda.id },
+    data: { email: 'admin@avaia.it', nome: 'Admin', password: adminPassword, ruolo: 'admin', aziendaId: azienda.id },
   })
 
   const editorPassword = await bcrypt.hash('editor-demo', 10)
   await prisma.utente.create({
-    data: { email: 'editor@kairos.it', nome: 'Editor Demo', password: editorPassword, ruolo: 'editor', aziendaId: azienda.id },
+    data: { email: 'editor@avaia.it', nome: 'Editor Demo', password: editorPassword, ruolo: 'editor', aziendaId: azienda.id },
   })
 
   // Ruoli soci
@@ -156,8 +156,8 @@ async function main() {
   console.log('Materiali api: Arnia, Telaio, Cera, Smielatore')
   console.log('Tariffe: €10/h (€12/h Amm) per socio e area')
   console.log('Luoghi: Santa Venerina, Stazzo, Api, Kairos')
-  console.log('Credenziali: admin@kairos.it / avaia-demo')
-  console.log('Editor:     editor@kairos.it / editor-demo (permessi limitati)')
+  console.log('Credenziali: admin@avaia.it / avaia-demo')
+  console.log('Editor:     editor@avaia.it / editor-demo (permessi limitati)')
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect())

@@ -56,8 +56,8 @@ export default function LoginPage() {
             {loading ? 'Accesso in corso...' : 'Accedi'}
           </Button>
           <div className="text-[11px] text-gray-300 text-center space-y-0.5">
-            <p>admin: admin@kairos.it / avaia-demo</p>
-            <p>editor: editor@kairos.it / editor-demo</p>
+            <p>admin: admin@avaia.it / avaia-demo</p>
+            <p>editor: editor@avaia.it / editor-demo</p>
           </div>
         </form>
       </div>
