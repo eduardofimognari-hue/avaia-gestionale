@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'avaia - Gestionale',
   description: 'Gestione multi-aziendale semplice e moderna',
-  manifest: '/manifest.ts',
+  manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'avaia' },
 }
 

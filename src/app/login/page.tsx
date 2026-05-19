@@ -55,7 +55,10 @@ export default function LoginPage() {
             className="w-full h-11 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 shadow-lg shadow-primary-200 transition-all">
             {loading ? 'Accesso in corso...' : 'Accedi'}
           </Button>
-          <p className="text-xs text-gray-300 text-center">demo: admin@kairos.it / avaia-demo</p>
+          <div className="text-[11px] text-gray-300 text-center space-y-0.5">
+            <p>admin: admin@kairos.it / avaia-demo</p>
+            <p>editor: editor@kairos.it / editor-demo</p>
+          </div>
         </form>
       </div>
     </div>

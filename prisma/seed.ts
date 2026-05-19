@@ -14,6 +14,11 @@ async function main() {
     data: { email: 'admin@kairos.it', nome: 'Admin', password: adminPassword, ruolo: 'admin', aziendaId: azienda.id },
   })
 
+  const editorPassword = await bcrypt.hash('editor-demo', 10)
+  await prisma.utente.create({
+    data: { email: 'editor@kairos.it', nome: 'Editor Demo', password: editorPassword, ruolo: 'editor', aziendaId: azienda.id },
+  })
+
   // Ruoli soci
   const ruoli: Record<string, { id: number }> = {}
   for (const nome of ['Socio Amministratore', 'Socio Lavoratore', 'Responsabile Legale', 'Socio Fondatore', 'Socio Finanziatore']) {
@@ -152,6 +157,7 @@ async function main() {
   console.log('Tariffe: €10/h (€12/h Amm) per socio e area')
   console.log('Luoghi: Santa Venerina, Stazzo, Api, Kairos')
   console.log('Credenziali: admin@kairos.it / avaia-demo')
+  console.log('Editor:     editor@kairos.it / editor-demo (permessi limitati)')
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect())

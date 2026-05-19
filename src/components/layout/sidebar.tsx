@@ -1,10 +1,14 @@
 'use client'
 import { cn } from '@/lib/utils'
-import { Package, Users, Euro, ShoppingCart, Warehouse, Hammer, PiggyBank, AlertTriangle, LayoutDashboard, LogOut, X, Menu, ArrowLeftRight, Receipt } from 'lucide-react'
+import { Package, Users, Euro, ShoppingCart, Warehouse, Hammer, PiggyBank, AlertTriangle, LayoutDashboard, LogOut, X, Menu, ArrowLeftRight, Receipt, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { AziendaSwitcher } from './azienda-switcher'
+
+interface SidebarProps {
+  ruolo?: string | null
+}
 
 const mainItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
@@ -26,14 +30,21 @@ const allItems = [
   { label: 'Debiti Clienti', icon: AlertTriangle, href: '/debiti' },
 ]
 
-export function Sidebar() {
+const adminItems = [
+  { label: 'Utenti', icon: Shield, href: '/utenti' },
+]
+
+export function Sidebar({ ruolo }: SidebarProps) {
   const pathname = usePathname()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const isAdmin = ruolo === 'admin'
 
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === '/dashboard'
     return pathname.startsWith(href)
   }
+
+  const visibleItems = isAdmin ? [...allItems, ...adminItems] : allItems
 
   return (
     <>
@@ -75,7 +86,7 @@ export function Sidebar() {
           <AziendaSwitcher />
         </div>
         <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-          {allItems.map((item) => (
+          {visibleItems.map((item) => (
             <Link key={item.href} href={item.href}
               className={cn('flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
                 isActive(item.href)
@@ -87,7 +98,12 @@ export function Sidebar() {
             </Link>
           ))}
         </nav>
-        <div className="p-3 border-t border-gray-100">
+        <div className="p-3 border-t border-gray-100 space-y-1">
+          {isAdmin && (
+            <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary-600 bg-primary-50 rounded-lg text-center">
+              Admin
+            </div>
+          )}
           <Link href="/api/auth/signout" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-500 hover:bg-gray-50 transition-colors">
             <LogOut className="w-4 h-4" /> Esci
           </Link>
@@ -120,7 +136,7 @@ export function Sidebar() {
             </div>
 
             <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-              {allItems.map((item) => (
+              {visibleItems.map((item) => (
                 <Link key={item.href} href={item.href} onClick={() => setDrawerOpen(false)}
                   className={cn('flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all',
                     isActive(item.href)
@@ -133,7 +149,12 @@ export function Sidebar() {
               ))}
             </nav>
 
-            <div className="p-3 border-t border-gray-100">
+            <div className="p-3 border-t border-gray-100 space-y-1">
+              {isAdmin && (
+                <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary-600 bg-primary-50 rounded-lg text-center">
+                  Admin
+                </div>
+              )}
               <Link href="/api/auth/signout" onClick={() => setDrawerOpen(false)}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-gray-500 hover:bg-gray-50 transition-colors">
                 <LogOut className="w-4 h-4" /> Esci
