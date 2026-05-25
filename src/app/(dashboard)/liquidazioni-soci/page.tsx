@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
-import { Plus, ArrowUpCircle, ArrowDownCircle, Landmark, CheckCircle } from 'lucide-react'
+import { Plus, ArrowUpCircle, ArrowDownCircle, Landmark, User, CheckCircle, Users } from 'lucide-react'
 import { formatDate, formatEuro } from '@/lib/utils'
 
 type Liquidazione = {
@@ -40,7 +40,9 @@ export default function LiquidazioniSociPage() {
   const [error, setError] = useState('')
   const [expanded, setExpanded] = useState<number | null>(null)
   const [saldoCassa, setSaldoCassa] = useState(0)
-  const [form, setForm] = useState({ data: '', socioId: '', periodoDa: '', periodoA: '', note: '' })
+  const [totaleCreditiSoci, setTotaleCreditiSoci] = useState(0)
+  const [totaleDebitiSoci, setTotaleDebitiSoci] = useState(0)
+  const [form, setForm] = useState({ data: '', socioId: '', tipo: 'credito', importo: '', note: '' })
 
   async function fetchData() {
     try {
@@ -53,6 +55,8 @@ export default function LiquidazioniSociPage() {
       const liqData = await resLiq.json()
       setData(liqData.liquidazioni ?? liqData)
       setSaldoCassa(liqData.saldoCassa ?? 0)
+      setTotaleCreditiSoci(liqData.totaleCreditiSoci ?? 0)
+      setTotaleDebitiSoci(liqData.totaleDebitiSoci ?? 0)
       setSoci(await resSoci.json())
     } catch { setError('Errore caricamento dati') }
     finally { setLoading(false) }
@@ -67,14 +71,14 @@ export default function LiquidazioniSociPage() {
       const body = {
         data: new Date(form.data).toISOString(),
         socioId: parseInt(form.socioId),
-        periodoDa: form.periodoDa ? new Date(form.periodoDa).toISOString() : null,
-        periodoA: form.periodoA ? new Date(form.periodoA).toISOString() : null,
+        tipo: form.tipo,
+        importo: parseFloat(form.importo),
         note: form.note || null
       }
       const res = await fetch('/api/liquidazioni-soci', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) throw new Error()
       setModalOpen(false)
-      setForm({ data: '', socioId: '', periodoDa: '', periodoA: '', note: '' })
+      setForm({ data: '', socioId: '', tipo: 'credito', importo: '', note: '' })
       await fetchData()
     } catch { setError('Errore durante il salvataggio') }
     finally { setSaving(false) }
@@ -97,34 +101,64 @@ export default function LiquidazioniSociPage() {
 
   return (
     <div>
-      <PageHeader title="Liquidazioni Soci" description="Compensazione periodica crediti/debiti soci" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Liquidazione</Button>} />
+      <PageHeader title="Liquidazioni Soci" description="Compensazione crediti/debiti con i soci" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Liquidazione</Button>} />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       {loading ? (
         <p className="text-gray-500">Caricamento...</p>
       ) : (
         <>
-          {/* Saldo Cassa in tempo reale */}
-          <Card className="mb-6">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-primary-50 p-2 text-primary-600">
-                  <Landmark className="w-5 h-5" />
+          {/* Riepilogo generale */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-primary-50 p-2 text-primary-600">
+                    <Landmark className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Cassa Generale</p>
+                    <p className={`text-xl font-bold ${saldoCassa >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
+                      {formatEuro(saldoCassa)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Saldo Cassa Generale</p>
-                  <p className={`text-2xl font-bold ${saldoCassa >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
-                    {formatEuro(saldoCassa)}
-                  </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-green-50 p-2 text-green-600">
+                    <ArrowUpCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Crediti soci verso azienda</p>
+                    <p className="text-xl font-bold text-green-700">{formatEuro(totaleCreditiSoci)}</p>
+                    <p className="text-[10px] text-gray-400">L&apos;azienda deve ai soci</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-red-50 p-2 text-red-600">
+                    <ArrowDownCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Debiti soci verso azienda</p>
+                    <p className="text-xl font-bold text-red-700">{formatEuro(totaleDebitiSoci)}</p>
+                    <p className="text-[10px] text-gray-400">I soci devono all&apos;azienda</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardContent className="p-0">
               <Table>
                 <Thead>
-                  <Tr><Th>Data</Th><Th>Socio</Th><Th>Crediti</Th><Th>Debiti</Th><Th>Netto</Th><Th>Periodo</Th><Th>Stato</Th><Th></Th></Tr>
+                  <Tr><Th>Data</Th><Th>Socio</Th><Th>Tipo</Th><Th>Importo</Th><Th>Note</Th><Th>Stato</Th><Th></Th></Tr>
                 </Thead>
                 <Tbody>
                   {data.map((l) => (
@@ -132,16 +166,21 @@ export default function LiquidazioniSociPage() {
                       <Tr key={l.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setExpanded(expanded === l.id ? null : l.id)}>
                         <Td>{formatDate(l.data)}</Td>
                         <Td className="font-medium">{l.socio.nome} {l.socio.cognome}</Td>
-                        <Td className="text-green-600 font-medium">{formatEuro(l.totaleCrediti)}</Td>
-                        <Td className="text-red-600 font-medium">{formatEuro(l.totaleDebiti)}</Td>
-                        <Td className="font-bold">
+                        <Td>
                           {l.importoNetto >= 0 ? (
-                            <span className="text-green-700"><ArrowUpCircle className="w-3 h-3 inline mr-1" />{formatEuro(l.importoNetto)}</span>
+                            <Badge variant="info"><ArrowUpCircle className="w-3 h-3 mr-1" /> Rimborso socio</Badge>
                           ) : (
-                            <span className="text-red-700"><ArrowDownCircle className="w-3 h-3 inline mr-1" />{formatEuro(Math.abs(l.importoNetto))}</span>
+                            <Badge variant="warning"><ArrowDownCircle className="w-3 h-3 mr-1" /> Recupero debito</Badge>
                           )}
                         </Td>
-                        <Td>{l.periodoDa && l.periodoA ? `${formatDate(l.periodoDa)} - ${formatDate(l.periodoA)}` : '-'}</Td>
+                        <Td className="font-bold">
+                          {l.importoNetto >= 0 ? (
+                            <span className="text-green-700">{formatEuro(l.importoNetto)}</span>
+                          ) : (
+                            <span className="text-red-700">{formatEuro(Math.abs(l.importoNetto))}</span>
+                          )}
+                        </Td>
+                        <Td className="text-gray-500 text-sm">{l.note || '-'}</Td>
                         <Td>
                           {l.stato === 'pagato' ? (
                             <Badge variant="success">Pagato</Badge>
@@ -165,7 +204,7 @@ export default function LiquidazioniSociPage() {
                         <Tr key={`detail-${l.id}`}>
                           <Td colSpan={8} className="bg-gray-50 p-0">
                             <div className="px-6 py-3">
-                              <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Movimenti inclusi:</p>
+                              <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Movimenti soci chiusi:</p>
                               {l.movimenti.map((m) => (
                                 <div key={m.id} className="flex items-center gap-3 text-sm py-1">
                                   <Badge variant={m.tipo === 'credito' ? 'info' : 'warning'} className="w-16 justify-center">{m.tipo}</Badge>
@@ -185,7 +224,7 @@ export default function LiquidazioniSociPage() {
                       )}
                     </>
                   ))}
-                  {data.length === 0 && <Tr><Td colSpan={8} className="text-center text-gray-500 py-8">Nessuna liquidazione trovata</Td></Tr>}
+                  {data.length === 0 && <Tr><Td colSpan={7} className="text-center text-gray-500 py-8">Nessuna liquidazione trovata</Td></Tr>}
                 </Tbody>
               </Table>
             </CardContent>
@@ -204,16 +243,27 @@ export default function LiquidazioniSociPage() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="text-sm font-medium block mb-1">Periodo da</label><Input type="date" value={form.periodoDa} onChange={(e) => setForm({ ...form, periodoDa: e.target.value })} /></div>
-            <div><label className="text-sm font-medium block mb-1">Periodo a</label><Input type="date" value={form.periodoA} onChange={(e) => setForm({ ...form, periodoA: e.target.value })} /></div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Tipo</label>
+              <Select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+                <option value="credito">Rimborso socio (azienda paga)</option>
+                <option value="debito">Recupero debito (socio paga)</option>
+              </Select>
+              <p className="text-[10px] text-gray-400 mt-1">
+                {form.tipo === 'credito'
+                  ? 'Il socio ha un credito: l\'azienda gli restituisce i soldi'
+                  : 'Il socio ha un debito: restituisce i soldi all\'azienda'}
+              </p>
+            </div>
+            <div><label className="text-sm font-medium block mb-1">Importo (€)</label><Input type="number" step="0.01" min="0" value={form.importo} onChange={(e) => setForm({ ...form, importo: e.target.value })} required /></div>
           </div>
-          <div><label className="text-sm font-medium block mb-1">Note</label><Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
+          <div><label className="text-sm font-medium block mb-1">Note</label><Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Motivo della liquidazione" /></div>
           <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded-lg">
-            La liquidazione calcolerà automaticamente il netto tra crediti e debiti non ancora liquidati del socio nel periodo selezionato.
+            La liquidazione creer&agrave; un movimento in contabilità al momento del pagamento. Verifica il saldo cassa prima di procedere.
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Annulla</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Calcolo in corso...' : 'Calcola e Salva'}</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Salva'}</Button>
           </div>
         </form>
       </Modal>

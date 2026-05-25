@@ -45,6 +45,27 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         },
       })
 
+      // Marca come liquidati i movimentiSoci aperti più vecchi di quel socio, fino a coprire l'importo
+      const daLiquidare = await prisma.movimentiSoci.findMany({
+        where: {
+          aziendaId,
+          socioId: liquidazione.socioId,
+          liquidato: false,
+          tipo: isRimborsoSocio ? 'credito' : 'debito',
+        },
+        orderBy: { data: 'asc' },
+      })
+
+      let daCoprire = Math.abs(liquidazione.importoNetto)
+      for (const m of daLiquidare) {
+        if (daCoprire <= 0) break
+        await prisma.movimentiSoci.update({
+          where: { id: m.id },
+          data: { liquidato: true, liquidazioneId },
+        })
+        daCoprire -= m.importo
+      }
+
       await prisma.liquidazioniSoci.update({
         where: { id: liquidazioneId },
         data: { stato: 'pagato', dataPagamento: new Date(), movimentoCassaId: movimentoCassa.id },

@@ -215,30 +215,44 @@ export default function ContabilitaPage() {
           {posizioniAperte.length > 0 && (
             <>
               <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 mt-6">
-                <User className="w-4 h-4 inline mr-1" /> Crediti / Debiti Soci Aperti
+                <User className="w-4 h-4 inline mr-1" /> Crediti e Debiti con i Soci
               </h3>
+              <p className="text-xs text-gray-400 mb-3">
+                Credito = il socio ha anticipato denaro, l&apos;azienda deve restituire &middot; Debito = l&apos;azienda ha anticipato denaro, il socio deve restituire
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 {posizioniAperte.map((p) => (
                   <Card key={p.socioId}>
                     <CardContent className="p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        <h4 className="text-sm font-medium text-gray-900">{p.socio.nome} {p.socio.cognome}</h4>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center text-primary-600 font-bold text-xs">
+                          {p.socio.nome[0]}{p.socio.cognome[0]}
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-900">{p.socio.nome} {p.socio.cognome}</h4>
+                          <p className="text-[10px] text-gray-400">Posizione finanziaria</p>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div>
-                          <p className="text-xs text-gray-500">Crediti</p>
-                          <p className="text-sm font-semibold text-green-600">{formatEuro(p.crediti)}</p>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <ArrowUpCircle className="w-3.5 h-3.5 text-green-600" />
+                            <span className="text-xs text-gray-600">A credito (da riscuotere)</span>
+                          </div>
+                          <span className="text-sm font-semibold text-green-700">{formatEuro(p.crediti)}</span>
                         </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Debiti</p>
-                          <p className="text-sm font-semibold text-red-600">{formatEuro(p.debiti)}</p>
+                        <div className="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <ArrowDownCircle className="w-3.5 h-3.5 text-red-600" />
+                            <span className="text-xs text-gray-600">A debito (da restituire)</span>
+                          </div>
+                          <span className="text-sm font-semibold text-red-700">{formatEuro(p.debiti)}</span>
                         </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Netto</p>
-                          <p className={`text-sm font-bold ${p.netto >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                            {p.netto >= 0 ? '+' : ''}{formatEuro(p.netto)}
-                          </p>
+                        <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                          <span className="text-xs font-medium text-gray-500">Saldo netto</span>
+                          <span className={`text-sm font-bold ${p.netto >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                            {p.netto >= 0 ? formatEuro(p.netto) + ' a tuo favore' : formatEuro(Math.abs(p.netto)) + ' da saldare'}
+                          </span>
                         </div>
                       </div>
                     </CardContent>

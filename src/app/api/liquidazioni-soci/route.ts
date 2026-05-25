@@ -10,7 +10,7 @@ export async function GET() {
     const aziendaId = await getCurrentAziendaId()
     if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
 
-    const [liquidazioni, casse] = await Promise.all([
+    const [liquidazioni, casse, posizioniSoci] = await Promise.all([
       prisma.liquidazioniSoci.findMany({
         where: { aziendaId },
         orderBy: { data: 'desc' },
@@ -24,6 +24,11 @@ export async function GET() {
         where: { aziendaId },
         include: { movimenti: { select: { tipo: true, importo: true } } },
       }),
+      prisma.movimentiSoci.groupBy({
+        by: ['tipo'],
+        where: { aziendaId, liquidato: false },
+        _sum: { importo: true },
+      }),
     ])
 
     const saldoCassa = casse.reduce((acc, c) => {
@@ -31,7 +36,10 @@ export async function GET() {
       return acc + c.saldoIniziale + movimentato
     }, 0)
 
-    return NextResponse.json({ liquidazioni, saldoCassa })
+    const totaleCreditiSoci = posizioniSoci.find(p => p.tipo === 'credito')?._sum.importo ?? 0
+    const totaleDebitiSoci = posizioniSoci.find(p => p.tipo === 'debito')?._sum.importo ?? 0
+
+    return NextResponse.json({ liquidazioni, saldoCassa, totaleCreditiSoci, totaleDebitiSoci })
   } catch {
     return NextResponse.json({ error: 'Errore nel recupero liquidazioni' }, { status: 500 })
   }
@@ -47,30 +55,19 @@ export async function POST(request: Request) {
     const body = await request.json()
     const parsed = liquidazioniSociSchema.parse(body)
 
-    const startDate = parsed.periodoDa ? new Date(parsed.periodoDa) : new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    const endDate = parsed.periodoA ? new Date(parsed.periodoA) : new Date()
-
-    const movimenti = await prisma.movimentiSoci.findMany({
-      where: { socioId: parsed.socioId, liquidato: false, data: { gte: startDate, lte: endDate }, aziendaId },
-    })
-
-    const totaleCrediti = movimenti.filter(m => m.tipo === 'credito').reduce((a, m) => a + m.importo, 0)
-    const totaleDebiti = movimenti.filter(m => m.tipo === 'debito').reduce((a, m) => a + m.importo, 0)
-    const importoNetto = totaleCrediti - totaleDebiti
+    const isCredito = parsed.tipo === 'credito'
 
     const liquidazione = await prisma.liquidazioniSoci.create({
       data: {
-        data: parsed.data ? new Date(parsed.data) : new Date(), socioId: parsed.socioId, aziendaId,
-        totaleCrediti, totaleDebiti, importoNetto,
-        periodoDa: startDate, periodoA: endDate,
+        data: parsed.data ? new Date(parsed.data) : new Date(),
+        socioId: parsed.socioId,
+        aziendaId,
+        totaleCrediti: isCredito ? parsed.importo : 0,
+        totaleDebiti: isCredito ? 0 : parsed.importo,
+        importoNetto: isCredito ? parsed.importo : -parsed.importo,
         note: parsed.note ?? null,
       },
       include: { socio: true },
-    })
-
-    await prisma.movimentiSoci.updateMany({
-      where: { socioId: parsed.socioId, liquidato: false, data: { gte: startDate, lte: endDate }, aziendaId },
-      data: { liquidato: true, liquidazioneId: liquidazione.id },
     })
 
     return NextResponse.json(liquidazione, { status: 201 })

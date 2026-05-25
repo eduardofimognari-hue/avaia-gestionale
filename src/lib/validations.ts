@@ -108,8 +108,8 @@ export const movimentiSociSchema = z.object({
 export const liquidazioniSociSchema = z.object({
   data: z.string().optional(),
   socioId: z.number({ required_error: 'Socio obbligatorio' }),
-  periodoDa: z.string().optional().nullable(),
-  periodoA: z.string().optional().nullable(),
+  tipo: z.enum(['credito', 'debito'], { required_error: 'Tipo non valido' }),
+  importo: z.number({ required_error: 'Importo obbligatorio' }).positive('Importo deve essere positivo'),
   note: z.string().optional().nullable(),
 })
 
