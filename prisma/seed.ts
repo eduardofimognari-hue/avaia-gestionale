@@ -84,7 +84,7 @@ async function main() {
   await prisma.luoghi.create({ data: { nome: 'Santa Venerina', tipo: 'fisico', aziendaId: azienda.id } })
   await prisma.luoghi.create({ data: { nome: 'Stazzo', tipo: 'fisico', aziendaId: azienda.id } })
   await prisma.luoghi.create({ data: { nome: 'Api', tipo: 'fisico', note: 'Apiari e arnie', aziendaId: azienda.id } })
-  await prisma.luoghi.create({ data: { nome: 'Kairos', tipo: 'virtuale', note: 'Spese generali aziendali', aziendaId: azienda.id } })
+  await prisma.luoghi.create({     data: { nome: 'Amministrazione', tipo: 'virtuale', note: 'Spese generali aziendali', aziendaId: azienda.id } })
 
   const aree: Record<string, { id: number }> = {}
   for (const nome of ['Agro', 'Api', 'Amministrazione', 'Commerciale', 'Mista', 'Servizi']) {
@@ -106,27 +106,27 @@ async function main() {
   }
 
   const cassaKairos = await prisma.casseInterne.create({
-    data: { nome: 'Kairos', saldoIniziale: 5000.00, note: 'Cassa unica aziendale', aziendaId: azienda.id },
+    data: { nome: 'Cassa Unica', saldoIniziale: 5000.00, note: 'Conto corrente aziendale principale', aziendaId: azienda.id },
   })
 
-  const kairosLuogo = await prisma.luoghi.findFirst({ where: { nome: 'Kairos', aziendaId: azienda.id } })
+  const amminLuogo = await prisma.luoghi.findFirst({ where: { nome: 'Amministrazione', aziendaId: azienda.id } })
   const sv = await prisma.luoghi.findFirst({ where: { nome: 'Santa Venerina', aziendaId: azienda.id } })
   const st = await prisma.luoghi.findFirst({ where: { nome: 'Stazzo', aziendaId: azienda.id } })
-  if (kairosLuogo && sv && st) {
-    await prisma.regoleRipartizione.create({ data: { luogoSorgenteId: kairosLuogo.id, luogoDestinazioneId: sv.id, percentuale: 50.0, anno: 2026, aziendaId: azienda.id } })
-    await prisma.regoleRipartizione.create({ data: { luogoSorgenteId: kairosLuogo.id, luogoDestinazioneId: st.id, percentuale: 50.0, anno: 2026, aziendaId: azienda.id } })
+  if (amminLuogo && sv && st) {
+    await prisma.regoleRipartizione.create({ data: { luogoSorgenteId: amminLuogo.id, luogoDestinazioneId: sv.id, percentuale: 50.0, anno: 2026, aziendaId: azienda.id } })
+    await prisma.regoleRipartizione.create({ data: { luogoSorgenteId: amminLuogo.id, luogoDestinazioneId: st.id, percentuale: 50.0, anno: 2026, aziendaId: azienda.id } })
   }
 
   const svLuogo = await prisma.luoghi.findFirst({ where: { nome: 'Santa Venerina', aziendaId: azienda.id } })
   const stLuogo = await prisma.luoghi.findFirst({ where: { nome: 'Stazzo', aziendaId: azienda.id } })
   const apiLuogo = await prisma.luoghi.findFirst({ where: { nome: 'Api', aziendaId: azienda.id } })
-  if (svLuogo && stLuogo && apiLuogo && kairosLuogo) {
+  if (svLuogo && stLuogo && apiLuogo && amminLuogo) {
     await prisma.movimentiCassa.createMany({
       data: [
         { data: new Date('2026-01-10'), cassaId: cassaKairos.id, luogoId: svLuogo.id, tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: 2000.00, categoria: 'Vendite', aziendaId: azienda.id },
         { data: new Date('2026-01-15'), cassaId: cassaKairos.id, luogoId: stLuogo.id, tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: 1500.00, categoria: 'Vendite', aziendaId: azienda.id },
         { data: new Date('2026-01-20'), cassaId: cassaKairos.id, luogoId: apiLuogo.id, tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: 800.00, categoria: 'Vendite', aziendaId: azienda.id },
-        { data: new Date('2026-02-01'), cassaId: cassaKairos.id, luogoId: kairosLuogo.id, tipo: 'uscita', tipoMovimento: 'spesa', importo: 300.00, categoria: 'Spese', aziendaId: azienda.id },
+        { data: new Date('2026-02-01'), cassaId: cassaKairos.id, luogoId: amminLuogo.id, tipo: 'uscita', tipoMovimento: 'spesa', importo: 300.00, categoria: 'Spese', aziendaId: azienda.id },
         { data: new Date('2026-02-05'), cassaId: cassaKairos.id, luogoId: svLuogo.id, tipo: 'uscita', tipoMovimento: 'spesa', importo: 150.00, categoria: 'Manutenzione', aziendaId: azienda.id },
       ],
     })
@@ -155,7 +155,7 @@ async function main() {
   console.log('Ruoli: Socio Amministratore, Socio Lavoratore, Resp. Legale, Socio Fondatore, Socio Finanziatore')
   console.log('Materiali api: Arnia, Telaio, Cera, Smielatore')
   console.log('Tariffe: €10/h (€12/h Amm) per socio e area')
-  console.log('Luoghi: Santa Venerina, Stazzo, Api, Kairos')
+  console.log('Luoghi: Santa Venerina, Stazzo, Api, Amministrazione')
   console.log('Credenziali: admin@avaia.it / avaia-demo')
   console.log('Editor:     editor@avaia.it / editor-demo (permessi limitati)')
 }

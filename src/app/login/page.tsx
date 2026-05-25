@@ -4,25 +4,35 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pageReady, setPageReady] = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setPageReady(true), 100)
+    return () => clearTimeout(t)
+  }, [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
+    setError('')
     const form = new FormData(e.currentTarget)
     const res = await signIn('credentials', {
       email: form.get('email'),
       password: form.get('password'),
       redirect: false,
     })
-    setLoading(false)
-    if (res?.error) setError('Email o password non validi')
-    else router.push('/dashboard')
+    if (res?.error) {
+      setError('Email o password non validi')
+      setLoading(false)
+    } else {
+      router.push('/dashboard')
+    }
   }
 
   return (
@@ -51,9 +61,9 @@ export default function LoginPage() {
             <Input id="password" name="password" type="password" required placeholder="••••••••"
               className="h-11 rounded-xl border-gray-200 focus:border-primary-400 focus:ring-primary-400" />
           </div>
-          <Button type="submit" disabled={loading}
+          <Button type="submit" disabled={loading || !pageReady}
             className="w-full h-11 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 shadow-lg shadow-primary-200 transition-all">
-            {loading ? 'Accesso in corso...' : 'Accedi'}
+            {loading ? 'Accesso in corso...' : pageReady ? 'Accedi' : 'Caricamento...'}
           </Button>
           <div className="text-[11px] text-gray-300 text-center space-y-0.5">
             <p>admin: admin@avaia.it / avaia-demo</p>

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
-import { Plus, Landmark, MapPin, User, ArrowUpDown, Download } from 'lucide-react'
+import { Plus, Landmark, MapPin, User, Building2, Coins } from 'lucide-react'
 import { formatDate, formatEuro } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -36,17 +36,17 @@ type Movimento = {
   descrizione: string | null
 }
 
-const TIPI_MOVIMENTO: Record<string, { label: string; icon: string; color: string }> = {
-  spesa: { label: 'Spesa', icon: '💸', color: 'red' },
-  entrata_generica: { label: 'Entrata generica', icon: '💰', color: 'green' },
-  anticipo_socio: { label: 'Anticipo socio', icon: '🤝', color: 'blue' },
-  rimborso_socio: { label: 'Rimborso socio', icon: '↩️', color: 'amber' },
-  anticipo_azienda: { label: 'Anticipo azienda', icon: '🏢', color: 'purple' },
-  rimborso_azienda: { label: 'Rimborso azienda', icon: '🔙', color: 'teal' },
-  stipendio: { label: 'Stipendio', icon: '💼', color: 'indigo' },
-  fornitore: { label: 'Fornitore', icon: '📦', color: 'orange' },
-  liquidazione: { label: 'Liquidazione', icon: '📄', color: 'pink' },
-  altro: { label: 'Altro', icon: '📌', color: 'gray' },
+const TIPI_MOVIMENTO: Record<string, { label: string; color: string }> = {
+  spesa: { label: 'Spesa', color: 'red' },
+  entrata_generica: { label: 'Entrata generica', color: 'green' },
+  anticipo_socio: { label: 'Anticipo socio', color: 'blue' },
+  rimborso_socio: { label: 'Rimborso socio', color: 'amber' },
+  anticipo_azienda: { label: 'Anticipo azienda', color: 'purple' },
+  rimborso_azienda: { label: 'Rimborso azienda', color: 'teal' },
+  stipendio: { label: 'Stipendio', color: 'indigo' },
+  fornitore: { label: 'Fornitore', color: 'orange' },
+  liquidazione: { label: 'Liquidazione', color: 'pink' },
+  altro: { label: 'Altro', color: 'gray' },
 }
 
 export default function ContabilitaPage() {
@@ -141,7 +141,7 @@ export default function ContabilitaPage() {
     <div>
       <PageHeader
         title="Contabilità"
-        description="Registro unico movimenti economici con sottocontabilità per luogo"
+        description="Cassa unica e sottocontabilità per luogo"
         action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuovo Movimento</Button>}
       />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
@@ -154,19 +154,19 @@ export default function ContabilitaPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Entrate</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Entrate del mese</p>
                 <p className="text-2xl font-bold text-green-600">{formatEuro(totaleEntrate)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Uscite</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Uscite del mese</p>
                 <p className="text-2xl font-bold text-red-600">{formatEuro(totaleUscite)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Saldo netto</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Saldo del mese</p>
                 <p className={`text-2xl font-bold ${totaleEntrate - totaleUscite >= 0 ? 'text-primary-600' : 'text-red-600'}`}>
                   {formatEuro(totaleEntrate - totaleUscite)}
                 </p>
@@ -174,44 +174,68 @@ export default function ContabilitaPage() {
             </Card>
           </div>
 
-          {/* Casse cards */}
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Casse / Conti</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Cassa Unica - conto principale */}
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
+            <Landmark className="w-4 h-4 inline mr-1" /> Conto Principale
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {casse.map((c) => (
               <Card key={c.id}>
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="rounded-lg bg-primary-50 p-2 text-primary-600"><Landmark className="w-5 h-5" /></div>
-                    <h3 className="font-semibold text-gray-900">{c.nome}</h3>
+                    <div className="rounded-lg bg-primary-50 p-2 text-primary-600">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 text-lg">{c.nome}</h3>
+                      <p className="text-xs text-gray-400">Fondo iniziale: {formatEuro(c.saldoIniziale)}</p>
+                    </div>
                   </div>
                   <p className="text-2xl font-bold text-gray-900">{formatEuro(calcSaldo(c))}</p>
-                  <p className="text-xs text-gray-500 mt-1">Saldo attuale</p>
+                  <p className="text-xs text-gray-500 mt-1">Saldo attuale complessivo</p>
                 </CardContent>
               </Card>
             ))}
+            {casse.length === 0 && (
+              <Card><CardContent className="p-4 text-gray-400">Nessun conto configurato</CardContent></Card>
+            )}
           </div>
 
-          {/* Luogo cards (clickabili) */}
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Sottocontabilità per Luogo</h3>
+          {/* Sottocontabilità per Luogo */}
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
+            <MapPin className="w-4 h-4 inline mr-1" /> Sottocontabilità per Luogo
+          </h3>
+          <p className="text-xs text-gray-400 mb-3">
+            La somma dei saldi dei luoghi corrisponde ai movimenti registrati, escluso il fondo iniziale.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {luoghi.map((l) => (
-              <Link key={l.id} href={`/contabilita/luogo/${l.id}`}>
-                <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <MapPin className="w-4 h-4 text-gray-400" />
-                      <h4 className="text-sm font-medium text-gray-900">{l.nome}</h4>
-                      <Badge variant="default" className="text-[10px] px-1.5">{l.tipo}</Badge>
-                    </div>
-                    <p className="text-lg font-bold text-gray-900">{formatEuro(calcSaldoPerLuogo(l.id))}</p>
-                    <p className="text-xs text-gray-500">Saldo {l.nome}</p>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+            {luoghi.map((l) => {
+              const saldo = calcSaldoPerLuogo(l.id)
+              return (
+                <Link key={l.id} href={`/contabilita/luogo/${l.id}`}>
+                  <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                    <CardContent className="p-4 flex flex-col justify-between h-full">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+                          <h4 className="text-sm font-medium text-gray-900 truncate">{l.nome}</h4>
+                          <Badge variant="default" className="text-[10px] px-1.5 shrink-0">{l.tipo}</Badge>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <p className={`text-lg font-bold ${saldo >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
+                          {formatEuro(saldo)}
+                        </p>
+                        <p className="text-xs text-gray-500">Saldo {l.nome}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              )
+            })}
           </div>
 
-          {/* Movimenti con filtri */}
+          {/* Movimenti */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -243,10 +267,10 @@ export default function ContabilitaPage() {
                 <Thead>
                   <Tr>
                     <Th>Data</Th>
-                    <Th>Cassa</Th>
+                    <Th>Conto</Th>
                     <Th>Luogo</Th>
+                    <Th>Entrata/Uscita</Th>
                     <Th>Tipo</Th>
-                    <Th>Movimento</Th>
                     <Th>Socio</Th>
                     <Th>Importo</Th>
                     <Th>Categoria</Th>
@@ -283,7 +307,7 @@ export default function ContabilitaPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium block mb-1">Cassa/Conto</label>
+              <label className="text-sm font-medium block mb-1">Conto</label>
               <Select value={form.cassaId} onChange={(e) => setForm({ ...form, cassaId: e.target.value })} required>
                 <option value="">Seleziona...</option>
                 {casse.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
@@ -308,17 +332,17 @@ export default function ContabilitaPage() {
                 required
               >
                 {Object.entries(TIPI_MOVIMENTO).map(([k, v]) => (
-                  <option key={k} value={k}>{v.icon} {v.label}</option>
+                  <option key={k} value={k}>{v.label}</option>
                 ))}
               </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium block mb-1">Direzione</label>
+              <label className="text-sm font-medium block mb-1">Entrata / Uscita</label>
               <Select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
-                <option value="entrata">Entrata 💰</option>
-                <option value="uscita">Uscita 💸</option>
+                <option value="entrata">Entrata</option>
+                <option value="uscita">Uscita</option>
               </Select>
             </div>
             <div>
@@ -329,16 +353,16 @@ export default function ContabilitaPage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium block mb-1">Luogo/Settore</label>
+              <label className="text-sm font-medium block mb-1">Luogo / Settore</label>
               <Select value={form.luogoId} onChange={(e) => setForm({ ...form, luogoId: e.target.value })}>
-                <option value="">Seleziona...</option>
+                <option value="">Nessuno (generale)</option>
                 {luoghi.map((l) => <option key={l.id} value={l.id}>{l.nome} ({l.tipo})</option>)}
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium block mb-1">Socio (opzionale)</label>
+              <label className="text-sm font-medium block mb-1">Socio (se applicabile)</label>
               <Select value={form.socioId} onChange={(e) => setForm({ ...form, socioId: e.target.value })}>
-                <option value="">Seleziona...</option>
+                <option value="">Nessuno</option>
                 {soci.map((s) => <option key={s.id} value={s.id}>{s.nome} {s.cognome}</option>)}
               </Select>
             </div>
