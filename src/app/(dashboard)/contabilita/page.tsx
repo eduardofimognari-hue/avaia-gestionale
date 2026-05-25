@@ -9,7 +9,10 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
-import { Plus, Landmark, MapPin, User, Building2, Coins, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
+import {
+  Plus, Landmark, MapPin, User, Building2, ArrowUpCircle, ArrowDownCircle,
+  ShoppingCart, Undo2, UserCheck, RotateCcw, Receipt, Circle, Briefcase, Truck, Package, UserPlus, UserMinus, ArrowDownToLine,
+} from 'lucide-react'
 import { formatDate, formatEuro } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -23,6 +26,7 @@ type Cassa = {
 type Luogo = { id: number; nome: string; tipo: string }
 type Socio = { id: number; nome: string; cognome: string }
 type PosizioneSocio = { socioId: number; socio: Socio; crediti: number; debiti: number; netto: number }
+type Riferimento = { id: number; tipo: string; label: string }
 
 type Movimento = {
   id: number
@@ -35,19 +39,35 @@ type Movimento = {
   importo: number
   categoria: string | null
   descrizione: string | null
+  stato: string | null
 }
 
-const TIPI_MOVIMENTO: Record<string, { label: string; color: string }> = {
-  spesa: { label: 'Spesa', color: 'red' },
-  entrata_generica: { label: 'Entrata generica', color: 'green' },
-  anticipo_socio: { label: 'Anticipo socio', color: 'blue' },
-  rimborso_socio: { label: 'Rimborso socio', color: 'amber' },
-  anticipo_azienda: { label: 'Anticipo azienda', color: 'purple' },
-  rimborso_azienda: { label: 'Rimborso azienda', color: 'teal' },
-  stipendio: { label: 'Stipendio', color: 'indigo' },
-  fornitore: { label: 'Fornitore', color: 'orange' },
-  liquidazione: { label: 'Liquidazione', color: 'pink' },
-  altro: { label: 'Altro', color: 'gray' },
+type TipoMovimentoDef = {
+  label: string; color: string; icon: any; direzione: 'entrata' | 'uscita'
+}
+
+const TIPI_MOVIMENTO: Record<string, TipoMovimentoDef> = {
+  entrata_generica: { label: 'Entrata generica', color: 'green', icon: ArrowDownToLine, direzione: 'entrata' },
+  anticipo_socio: { label: 'Anticipo socio', color: 'blue', icon: UserPlus, direzione: 'entrata' },
+  rimborso_azienda: { label: 'Rimborso azienda', color: 'teal', icon: Undo2, direzione: 'entrata' },
+  incasso_cliente: { label: 'Incasso cliente', color: 'green', icon: UserCheck, direzione: 'entrata' },
+  rimborso_fornitore: { label: 'Rimborso fornitore', color: 'orange', icon: RotateCcw, direzione: 'entrata' },
+  liquidazione_credito: { label: 'Liquidazione credito', color: 'pink', icon: Receipt, direzione: 'entrata' },
+  spesa: { label: 'Spesa', color: 'red', icon: ShoppingCart, direzione: 'uscita' },
+  anticipo_azienda: { label: 'Anticipo azienda', color: 'purple', icon: UserMinus, direzione: 'uscita' },
+  rimborso_socio: { label: 'Rimborso socio', color: 'amber', icon: Undo2, direzione: 'uscita' },
+  stipendio: { label: 'Stipendio', color: 'indigo', icon: Briefcase, direzione: 'uscita' },
+  fornitore: { label: 'Fornitore', color: 'orange', icon: Truck, direzione: 'uscita' },
+  acquisto: { label: 'Acquisto', color: 'red', icon: Package, direzione: 'uscita' },
+  liquidazione: { label: 'Liquidazione', color: 'pink', icon: Receipt, direzione: 'uscita' },
+  altro: { label: 'Altro', color: 'gray', icon: Circle, direzione: 'entrata' },
+}
+
+const STATO_MOVIMENTO: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' }> = {
+  pagato: { label: 'Pagato', variant: 'success' },
+  da_pagare: { label: 'Da pagare', variant: 'warning' },
+  da_riscuotere: { label: 'Da riscuotere', variant: 'warning' },
+  riscosso: { label: 'Riscosso', variant: 'success' },
 }
 
 export default function ContabilitaPage() {
@@ -56,6 +76,8 @@ export default function ContabilitaPage() {
   const [luoghi, setLuoghi] = useState<Luogo[]>([])
   const [soci, setSoci] = useState<Socio[]>([])
   const [posizioniAperte, setPosizioniAperte] = useState<PosizioneSocio[]>([])
+  const [riferimenti, setRiferimenti] = useState<Riferimento[]>([])
+  const [cassaUnica, setCassaUnica] = useState<{ id: number; nome: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -63,8 +85,9 @@ export default function ContabilitaPage() {
   const [filtroLuogo, setFiltroLuogo] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
   const [form, setForm] = useState({
-    cassaId: '', tipo: 'entrata', tipoMovimento: 'spesa', importo: '',
-    luogoId: '', socioId: '', categoria: '', descrizione: '', riferimento: '',
+    tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: '',
+    luogoId: '', socioId: '', categoria: '', descrizione: '',
+    riferimento: '', riferimentoId: '', riferimentoTipo: '', stato: 'pagato',
   })
 
   async function fetchData() {
@@ -78,6 +101,8 @@ export default function ContabilitaPage() {
       setLuoghi(data.luoghi)
       setSoci(data.soci)
       setPosizioniAperte(data.posizioniAperte ?? [])
+      setRiferimenti(data.riferimenti ?? [])
+      setCassaUnica(data.cassaUnica ?? null)
     } catch { setError('Errore caricamento dati') }
     finally { setLoading(false) }
   }
@@ -95,6 +120,10 @@ export default function ContabilitaPage() {
     }, 0)
   }
 
+  function getTipiPerDirezione(direzione: string) {
+    return Object.entries(TIPI_MOVIMENTO).filter(([, v]) => v.direzione === direzione)
+  }
+
   const movimentiFiltrati = movimenti.filter(m => {
     if (filtroLuogo && (!m.luogo || m.luogo.id !== parseInt(filtroLuogo))) return false
     if (filtroTipo && m.tipoMovimento !== filtroTipo) return false
@@ -106,7 +135,6 @@ export default function ContabilitaPage() {
     setSaving(true)
     try {
       const body: any = {
-        cassaId: parseInt(form.cassaId),
         tipo: form.tipo,
         tipoMovimento: form.tipoMovimento,
         importo: parseFloat(form.importo),
@@ -114,14 +142,20 @@ export default function ContabilitaPage() {
         socioId: form.socioId ? parseInt(form.socioId) : null,
         categoria: form.categoria || null,
         descrizione: form.descrizione || null,
-        riferimento: form.riferimento || null,
+        stato: form.stato || 'pagato',
+      }
+      if (form.riferimentoId) {
+        body.riferimentoId = parseInt(form.riferimentoId)
+        body.riferimentoTipo = form.riferimentoTipo || null
+      } else if (form.riferimento) {
+        body.riferimento = form.riferimento
       }
       const res = await fetch('/api/contabilita', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error()
       setModalOpen(false)
-      setForm({ cassaId: '', tipo: 'entrata', tipoMovimento: 'spesa', importo: '', luogoId: '', socioId: '', categoria: '', descrizione: '', riferimento: '' })
+      setForm({ tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: '', luogoId: '', socioId: '', categoria: '', descrizione: '', riferimento: '', riferimentoId: '', riferimentoTipo: '', stato: 'pagato' })
       await fetchData()
     } catch { setError('Errore durante il salvataggio') }
     finally { setSaving(false) }
@@ -137,6 +171,10 @@ export default function ContabilitaPage() {
     return map[info.color] || 'default'
   }
 
+  const tipiEntrata = getTipiPerDirezione('entrata')
+  const tipiUscita = getTipiPerDirezione('uscita')
+  const tipiCorrenti = form.tipo === 'entrata' ? tipiEntrata : tipiUscita
+
   return (
     <div>
       <PageHeader
@@ -150,7 +188,7 @@ export default function ContabilitaPage() {
         <p className="text-gray-500">Caricamento...</p>
       ) : (
         <>
-          {/* Cassa Unica - conto principale */}
+          {/* Cassa Unica */}
           <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
             <Landmark className="w-4 h-4 inline mr-1" /> Conto Principale
           </h3>
@@ -300,28 +338,31 @@ export default function ContabilitaPage() {
                     <Th>Tipo</Th>
                     <Th>Socio</Th>
                     <Th>Importo</Th>
-                    <Th>Categoria</Th>
+                    <Th>Stato</Th>
                     <Th>Descrizione</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {movimentiFiltrati.map((m) => (
-                    <Tr key={m.id}>
-                      <Td>{formatDate(m.data)}</Td>
-                      <Td>{m.cassa.nome}</Td>
-                      <Td>{m.luogo ? <><span className="font-medium text-xs">{m.luogo.nome}</span> <Badge variant="default" className="text-[10px] px-1">{m.luogo.tipo}</Badge></> : '-'}</Td>
-                      <Td><Badge variant={m.tipo === 'entrata' ? 'success' : 'danger'}>{m.tipo === 'entrata' ? 'Entrata' : 'Uscita'}</Badge></Td>
-                      <Td>
-                        <Badge variant={getTipoBadgeColor(m.tipoMovimento)} className="text-xs">
-                          {TIPI_MOVIMENTO[m.tipoMovimento]?.label || m.tipoMovimento}
-                        </Badge>
-                      </Td>
-                      <Td>{m.socio ? `${m.socio.nome} ${m.socio.cognome}` : '-'}</Td>
-                      <Td className="font-medium">{formatEuro(m.importo)}</Td>
-                      <Td>{m.categoria || '-'}</Td>
-                      <Td>{m.descrizione || '-'}</Td>
-                    </Tr>
-                  ))}
+                  {movimentiFiltrati.map((m) => {
+                    const statoInfo = STATO_MOVIMENTO[m.stato ?? ''] ?? { label: m.stato ?? '-', variant: 'default' as const }
+                    return (
+                      <Tr key={m.id}>
+                        <Td>{formatDate(m.data)}</Td>
+                        <Td>{m.cassa.nome}</Td>
+                        <Td>{m.luogo ? <><span className="font-medium text-xs">{m.luogo.nome}</span> <Badge variant="default" className="text-[10px] px-1">{m.luogo.tipo}</Badge></> : '-'}</Td>
+                        <Td><Badge variant={m.tipo === 'entrata' ? 'success' : 'danger'}>{m.tipo === 'entrata' ? 'Entrata' : 'Uscita'}</Badge></Td>
+                        <Td>
+                          <Badge variant={getTipoBadgeColor(m.tipoMovimento)} className="text-xs">
+                            {TIPI_MOVIMENTO[m.tipoMovimento]?.label || m.tipoMovimento}
+                          </Badge>
+                        </Td>
+                        <Td>{m.socio ? `${m.socio.nome} ${m.socio.cognome}` : '-'}</Td>
+                        <Td className="font-medium">{formatEuro(m.importo)}</Td>
+                        <Td><Badge variant={statoInfo.variant}>{statoInfo.label}</Badge></Td>
+                        <Td>{m.descrizione || '-'}</Td>
+                      </Tr>
+                    )
+                  })}
                   {movimentiFiltrati.length === 0 && <Tr><Td colSpan={9} className="text-center text-gray-500 py-8">Nessun movimento trovato</Td></Tr>}
                 </Tbody>
               </Table>
@@ -332,45 +373,40 @@ export default function ContabilitaPage() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nuovo Movimento Contabile">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium block mb-1">Conto</label>
-              <Select value={form.cassaId} onChange={(e) => setForm({ ...form, cassaId: e.target.value })} required>
-                <option value="">Seleziona...</option>
-                {casse.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </Select>
+          {/* Cassa (solo informativo) */}
+          {cassaUnica && (
+            <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+              <Landmark className="w-4 h-4 text-gray-400" />
+              <span>Conto: <strong>{cassaUnica.nome}</strong></span>
             </div>
-            <div>
-              <label className="text-sm font-medium block mb-1">Tipo movimento</label>
-              <select
-                value={form.tipoMovimento}
-                onChange={(e) => {
-                  const val = e.target.value
-                  const direzione: Record<string, string> = {
-                    spesa: 'uscita', entrata_generica: 'entrata',
-                    anticipo_socio: 'entrata', rimborso_socio: 'uscita',
-                    anticipo_azienda: 'uscita', rimborso_azienda: 'entrata',
-                    stipendio: 'uscita', fornitore: 'uscita',
-                    liquidazione: 'uscita', altro: 'entrata',
-                  }
-                  setForm({ ...form, tipoMovimento: val, tipo: direzione[val] || 'entrata' })
-                }}
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-                required
-              >
-                {Object.entries(TIPI_MOVIMENTO).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
+
+          {/* Entrata / Uscita */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium block mb-1">Entrata / Uscita</label>
-              <Select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
-                <option value="entrata">Entrata</option>
-                <option value="uscita">Uscita</option>
-              </Select>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const primoEntrata = tipiEntrata[0]
+                    setForm({ ...form, tipo: 'entrata', tipoMovimento: primoEntrata ? primoEntrata[0] : 'entrata_generica', stato: 'pagato' })
+                  }}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${form.tipo === 'entrata' ? 'bg-green-50 border-green-300 text-green-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                >
+                  <ArrowDownToLine className="w-4 h-4 inline mr-1" /> Entrata
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const primoUscita = tipiUscita[0]
+                    setForm({ ...form, tipo: 'uscita', tipoMovimento: primoUscita ? primoUscita[0] : 'spesa', stato: 'da_pagare' })
+                  }}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${form.tipo === 'uscita' ? 'bg-red-50 border-red-300 text-red-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                >
+                  <ShoppingCart className="w-4 h-4 inline mr-1" /> Uscita
+                </button>
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium block mb-1">Importo (€)</label>
@@ -378,7 +414,50 @@ export default function ContabilitaPage() {
                 onChange={(e) => setForm({ ...form, importo: e.target.value })} required />
             </div>
           </div>
+
+          {/* Tipo movimento (filtrato per direzione) */}
+          <div>
+            <label className="text-sm font-medium block mb-1">Tipo movimento</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {tipiCorrenti.map(([k, v]) => {
+                const Icon = v.icon
+                const isSelected = form.tipoMovimento === k
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => {
+                      const st = (form.tipo === 'entrata' && (k === 'incasso_cliente' || k === 'rimborso_fornitore' || k === 'liquidazione_credito'))
+                        ? 'da_riscuotere'
+                        : (form.tipo === 'uscita' && (k === 'spesa' || k === 'fornitore' || k === 'acquisto'))
+                          ? 'da_pagare'
+                          : form.tipo === 'entrata' ? 'riscosso' : 'pagato'
+                      setForm({ ...form, tipoMovimento: k, stato: st })
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${isSelected
+                      ? form.tipo === 'entrata' ? 'bg-green-50 border-green-300 text-green-700' : 'bg-red-50 border-red-300 text-red-700'
+                      : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{v.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Stato */}
           <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium block mb-1">Stato</label>
+              <Select value={form.stato} onChange={(e) => setForm({ ...form, stato: e.target.value })}>
+                <option value="pagato">Pagato</option>
+                <option value="da_pagare">Da pagare</option>
+                <option value="riscosso">Riscosso</option>
+                <option value="da_riscuotere">Da riscuotere</option>
+              </Select>
+            </div>
             <div>
               <label className="text-sm font-medium block mb-1">Luogo / Settore</label>
               <Select value={form.luogoId} onChange={(e) => setForm({ ...form, luogoId: e.target.value })}>
@@ -386,14 +465,21 @@ export default function ContabilitaPage() {
                 {luoghi.map((l) => <option key={l.id} value={l.id}>{l.nome} ({l.tipo})</option>)}
               </Select>
             </div>
-            <div>
-              <label className="text-sm font-medium block mb-1">Socio (se applicabile)</label>
-              <Select value={form.socioId} onChange={(e) => setForm({ ...form, socioId: e.target.value })}>
-                <option value="">Nessuno</option>
-                {soci.map((s) => <option key={s.id} value={s.id}>{s.nome} {s.cognome}</option>)}
-              </Select>
-            </div>
           </div>
+
+          {/* Socio (per movimenti interni) */}
+          <div>
+            <label className="text-sm font-medium block mb-1">
+              Socio {form.tipoMovimento === 'anticipo_socio' || form.tipoMovimento === 'rimborso_socio' || form.tipoMovimento === 'anticipo_azienda' || form.tipoMovimento === 'rimborso_azienda' ? <span className="text-red-500">*</span> : ''}
+              {form.tipoMovimento === 'incasso_cliente' || form.tipoMovimento === 'fornitore' ? <span className="text-xs text-gray-400 ml-1">(non serve per movimenti esterni)</span> : ''}
+            </label>
+            <Select value={form.socioId} onChange={(e) => setForm({ ...form, socioId: e.target.value })}>
+              <option value="">Nessuno</option>
+              {soci.map((s) => <option key={s.id} value={s.id}>{s.nome} {s.cognome}</option>)}
+            </Select>
+          </div>
+
+          {/* Categoria e Riferimento */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium block mb-1">Categoria</label>
@@ -412,13 +498,46 @@ export default function ContabilitaPage() {
             </div>
             <div>
               <label className="text-sm font-medium block mb-1">Riferimento</label>
-              <Input value={form.riferimento} onChange={(e) => setForm({ ...form, riferimento: e.target.value })} placeholder="Fattura, DDT, ecc." />
+              <Select
+                value={form.riferimentoId ? `${form.riferimentoTipo}-${form.riferimentoId}` : ''}
+                onChange={(e) => {
+                  const val = e.target.value
+                  if (!val) {
+                    setForm({ ...form, riferimentoId: '', riferimentoTipo: '', riferimento: '' })
+                    return
+                  }
+                  const [tipo, idStr] = val.split('-')
+                  const rif = riferimenti.find(r => r.tipo === tipo && r.id === parseInt(idStr))
+                  setForm({
+                    ...form,
+                    riferimentoId: idStr,
+                    riferimentoTipo: tipo,
+                    riferimento: rif?.label ?? '',
+                  })
+                }}
+              >
+                <option value="">Nessuno</option>
+                {riferimenti.map((r) => (
+                  <option key={`${r.tipo}-${r.id}`} value={`${r.tipo}-${r.id}`}>{r.label}</option>
+                ))}
+              </Select>
+              {!form.riferimentoId && (
+                <Input
+                  value={form.riferimento}
+                  onChange={(e) => setForm({ ...form, riferimento: e.target.value })}
+                  placeholder="Oppure scrivi manualmente"
+                  className="mt-1"
+                />
+              )}
             </div>
           </div>
+
+          {/* Descrizione */}
           <div>
             <label className="text-sm font-medium block mb-1">Descrizione</label>
             <Input value={form.descrizione} onChange={(e) => setForm({ ...form, descrizione: e.target.value })} />
           </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Annulla</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Salva'}</Button>

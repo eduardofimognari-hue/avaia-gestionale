@@ -82,16 +82,24 @@ export const cassaNuovaSchema = z.object({
 })
 
 export const cassaMovimentoSchema = z.object({
-  cassaId: z.number({ required_error: 'Cassa obbligatoria' }),
+  cassaId: z.number({ required_error: 'Cassa obbligatoria' }).optional(),
   data: z.string().optional(),
   luogoId: z.number().optional().nullable(),
   socioId: z.number().optional().nullable(),
   tipo: z.enum(['entrata', 'uscita'], { required_error: 'Tipo non valido' }),
-  tipoMovimento: z.enum(['spesa', 'entrata_generica', 'anticipo_socio', 'rimborso_socio', 'anticipo_azienda', 'rimborso_azienda', 'stipendio', 'fornitore', 'liquidazione', 'altro'], { required_error: 'Tipo movimento non valido' }).optional().default('altro'),
+  tipoMovimento: z.enum([
+    'entrata_generica', 'anticipo_socio', 'rimborso_azienda', 'incasso_cliente',
+    'rimborso_fornitore', 'liquidazione_credito',
+    'spesa', 'anticipo_azienda', 'rimborso_socio', 'stipendio', 'fornitore',
+    'acquisto', 'liquidazione', 'altro',
+  ], { required_error: 'Tipo movimento non valido' }).optional().default('altro'),
   importo: z.number().positive('Importo deve essere positivo'),
   categoria: z.string().optional().nullable(),
   descrizione: z.string().optional().nullable(),
   riferimento: z.string().optional().nullable(),
+  riferimentoId: z.number().optional().nullable(),
+  riferimentoTipo: z.string().optional().nullable(),
+  stato: z.enum(['pagato', 'da_pagare', 'da_riscuotere', 'riscosso']).optional().default('pagato'),
 })
 
 export const contabilitaMovimentoSchema = cassaMovimentoSchema

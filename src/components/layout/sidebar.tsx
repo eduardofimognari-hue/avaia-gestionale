@@ -1,6 +1,6 @@
 'use client'
 import { cn } from '@/lib/utils'
-import { Package, Users, Euro, ShoppingCart, Warehouse, Hammer, Landmark, AlertTriangle, LayoutDashboard, LogOut, X, Menu, Receipt, Shield, Sprout, FileText } from 'lucide-react'
+import { Package, Users, Euro, ShoppingCart, Warehouse, Hammer, Landmark, LayoutDashboard, LogOut, X, Menu, Receipt, Shield, Sprout, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -27,7 +27,6 @@ const allItems = [
   { label: 'Lavoro Soci', icon: Hammer, href: '/lavoro-soci' },
   { label: 'Contabilità', icon: Landmark, href: '/contabilita' },
   { label: 'Liquidazioni Soci', icon: Receipt, href: '/liquidazioni-soci' },
-  { label: 'Debiti Clienti', icon: AlertTriangle, href: '/debiti' },
   { label: 'DDT / Fatture', icon: FileText, href: '/documenti' },
 ]
 

@@ -317,6 +317,9 @@ model MovimentiCassa {
   categoria     String?
   descrizione   String?
   riferimento   String?
+  riferimentoId Int?
+  riferimentoTipo String?
+  stato         String   @default("pagato")
   creatoIl      DateTime @default(now())
   aziendaId     Int
   azienda       Azienda  @relation(fields: [aziendaId], references: [id])

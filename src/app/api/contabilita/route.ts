@@ -10,7 +10,7 @@ export async function GET() {
     const aziendaId = await getCurrentAziendaId()
     if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
 
-    const [casse, luoghi, movimenti, soci, movimentiSoci, posizioniSoci] = await Promise.all([
+    const [casse, luoghi, movimenti, soci, movimentiSoci, posizioniSoci, vendite, documenti] = await Promise.all([
       prisma.casseInterne.findMany({
         where: { aziendaId },
         include: { movimenti: { select: { tipo: true, importo: true, luogoId: true } } },
@@ -38,6 +38,18 @@ export async function GET() {
         where: { aziendaId, liquidato: false },
         _sum: { importo: true },
       }),
+      prisma.vendite.findMany({
+        where: { aziendaId },
+        select: { id: true, data: true, importoTotale: true, cliente: { select: { nome: true, cognome: true } } },
+        orderBy: { data: 'desc' },
+        take: 50,
+      }),
+      prisma.documenti.findMany({
+        where: { aziendaId },
+        select: { id: true, tipo: true, numero: true, anno: true, data: true, importoTotale: true },
+        orderBy: { data: 'desc' },
+        take: 50,
+      }),
     ])
 
     const posizioniAperte = soci.map(s => {
@@ -46,7 +58,25 @@ export async function GET() {
       return { socioId: s.id, socio: s, crediti, debiti, netto: crediti - debiti }
     }).filter(p => p.netto !== 0)
 
-    return NextResponse.json({ casse, luoghi, movimenti, soci, movimentiSoci, posizioniAperte })
+    const riferimenti = [
+      ...vendite.map(v => ({
+        id: v.id, tipo: 'vendita',
+        label: `Vendita #${v.id} - ${v.cliente ? `${v.cliente.nome} ${v.cliente.cognome ?? ''}` : 'N/A'} - ${v.importoTotale ? `€${v.importoTotale}` : ''}`,
+        data: v.data,
+      })),
+      ...documenti.map(d => ({
+        id: d.id, tipo: d.tipo,
+        label: `${d.tipo.toUpperCase()} #${d.numero}/${d.anno} - €${d.importoTotale}`,
+        data: d.data,
+      })),
+    ].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+
+    const primaCassa = casse[0]
+
+    return NextResponse.json({
+      casse, luoghi, movimenti, soci, movimentiSoci, posizioniAperte, riferimenti,
+      cassaUnica: primaCassa ? { id: primaCassa.id, nome: primaCassa.nome } : null,
+    })
   } catch (error) {
     return NextResponse.json({ error: 'Errore nel recupero dati contabilità' }, { status: 500 })
   }
@@ -62,10 +92,18 @@ export async function POST(request: Request) {
     const body = await request.json()
     const parsed = contabilitaMovimentoSchema.parse(body)
 
+    // Se cassaId non fornito, usa la prima cassa disponibile
+    let cassaId = parsed.cassaId
+    if (!cassaId) {
+      const primaCassa = await prisma.casseInterne.findFirst({ where: { aziendaId }, orderBy: { id: 'asc' } })
+      if (!primaCassa) return NextResponse.json({ error: 'Nessuna cassa configurata' }, { status: 400 })
+      cassaId = primaCassa.id
+    }
+
     const movimento = await prisma.movimentiCassa.create({
       data: {
         data: parsed.data ? new Date(parsed.data) : new Date(),
-        cassaId: parsed.cassaId,
+        cassaId,
         aziendaId,
         luogoId: parsed.luogoId ?? null,
         socioId: parsed.socioId ?? null,
@@ -75,6 +113,9 @@ export async function POST(request: Request) {
         categoria: parsed.categoria ?? null,
         descrizione: parsed.descrizione ?? null,
         riferimento: parsed.riferimento ?? null,
+        riferimentoId: parsed.riferimentoId ?? null,
+        riferimentoTipo: parsed.riferimentoTipo ?? null,
+        stato: parsed.stato ?? 'pagato',
       },
       include: {
         cassa: { select: { nome: true } },
@@ -83,7 +124,7 @@ export async function POST(request: Request) {
       },
     })
 
-    // Se � un anticipo, genera automaticamente il corrispondente movimento socio
+    // Auto-generazione movimenti soci per anticipi
     if (parsed.socioId && parsed.tipoMovimento === 'anticipo_socio' && parsed.tipo === 'entrata') {
       await prisma.movimentiSoci.create({
         data: {
