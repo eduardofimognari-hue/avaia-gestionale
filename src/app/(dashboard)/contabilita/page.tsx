@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
-import { Plus, Landmark, MapPin, User, Building2, Coins } from 'lucide-react'
+import { Plus, Landmark, MapPin, User, Building2, Coins, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
 import { formatDate, formatEuro } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -22,6 +22,7 @@ type Cassa = {
 
 type Luogo = { id: number; nome: string; tipo: string }
 type Socio = { id: number; nome: string; cognome: string }
+type PosizioneSocio = { socioId: number; socio: Socio; crediti: number; debiti: number; netto: number }
 
 type Movimento = {
   id: number
@@ -54,6 +55,7 @@ export default function ContabilitaPage() {
   const [movimenti, setMovimenti] = useState<Movimento[]>([])
   const [luoghi, setLuoghi] = useState<Luogo[]>([])
   const [soci, setSoci] = useState<Socio[]>([])
+  const [posizioniAperte, setPosizioniAperte] = useState<PosizioneSocio[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -75,6 +77,7 @@ export default function ContabilitaPage() {
       setMovimenti(data.movimenti)
       setLuoghi(data.luoghi)
       setSoci(data.soci)
+      setPosizioniAperte(data.posizioniAperte ?? [])
     } catch { setError('Errore caricamento dati') }
     finally { setLoading(false) }
   }
@@ -91,9 +94,6 @@ export default function ContabilitaPage() {
       return acc + movimentiLuogo.reduce((a, m) => m.tipo === 'entrata' ? a + m.importo : a - m.importo, 0)
     }, 0)
   }
-
-  const totaleEntrate = movimenti.filter(m => m.tipo === 'entrata').reduce((a, m) => a + m.importo, 0)
-  const totaleUscite = movimenti.filter(m => m.tipo === 'uscita').reduce((a, m) => a + m.importo, 0)
 
   const movimentiFiltrati = movimenti.filter(m => {
     if (filtroLuogo && (!m.luogo || m.luogo.id !== parseInt(filtroLuogo))) return false
@@ -150,30 +150,6 @@ export default function ContabilitaPage() {
         <p className="text-gray-500">Caricamento...</p>
       ) : (
         <>
-          {/* Riepilogo mensile */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Entrate del mese</p>
-                <p className="text-2xl font-bold text-green-600">{formatEuro(totaleEntrate)}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Uscite del mese</p>
-                <p className="text-2xl font-bold text-red-600">{formatEuro(totaleUscite)}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Saldo del mese</p>
-                <p className={`text-2xl font-bold ${totaleEntrate - totaleUscite >= 0 ? 'text-primary-600' : 'text-red-600'}`}>
-                  {formatEuro(totaleEntrate - totaleUscite)}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Cassa Unica - conto principale */}
           <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
             <Landmark className="w-4 h-4 inline mr-1" /> Conto Principale
@@ -188,11 +164,11 @@ export default function ContabilitaPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900 text-lg">{c.nome}</h3>
-                      <p className="text-xs text-gray-400">Fondo iniziale: {formatEuro(c.saldoIniziale)}</p>
+                      <p className="text-xs text-gray-400">Cassa Unica</p>
                     </div>
                   </div>
                   <p className="text-2xl font-bold text-gray-900">{formatEuro(calcSaldo(c))}</p>
-                  <p className="text-xs text-gray-500 mt-1">Saldo attuale complessivo</p>
+                  <p className="text-xs text-gray-500 mt-1">Saldo</p>
                 </CardContent>
               </Card>
             ))}
@@ -206,7 +182,7 @@ export default function ContabilitaPage() {
             <MapPin className="w-4 h-4 inline mr-1" /> Sottocontabilità per Luogo
           </h3>
           <p className="text-xs text-gray-400 mb-3">
-            La somma dei saldi dei luoghi corrisponde ai movimenti registrati, escluso il fondo iniziale.
+            Ogni luogo ha la sua sottocontabilità. La somma dei saldi di tutti i luoghi corrisponde al saldo della Cassa Unica.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {luoghi.map((l) => {
@@ -234,6 +210,43 @@ export default function ContabilitaPage() {
               )
             })}
           </div>
+
+          {/* Posizioni soci aperte */}
+          {posizioniAperte.length > 0 && (
+            <>
+              <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 mt-6">
+                <User className="w-4 h-4 inline mr-1" /> Crediti / Debiti Soci Aperti
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                {posizioniAperte.map((p) => (
+                  <Card key={p.socioId}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <User className="w-4 h-4 text-gray-400" />
+                        <h4 className="text-sm font-medium text-gray-900">{p.socio.nome} {p.socio.cognome}</h4>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <p className="text-xs text-gray-500">Crediti</p>
+                          <p className="text-sm font-semibold text-green-600">{formatEuro(p.crediti)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Debiti</p>
+                          <p className="text-sm font-semibold text-red-600">{formatEuro(p.debiti)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Netto</p>
+                          <p className={`text-sm font-bold ${p.netto >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                            {p.netto >= 0 ? '+' : ''}{formatEuro(p.netto)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* Movimenti */}
           <Card>

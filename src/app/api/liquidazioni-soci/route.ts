@@ -9,15 +9,29 @@ export async function GET() {
   try {
     const aziendaId = await getCurrentAziendaId()
     if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const data = await prisma.liquidazioniSoci.findMany({
-      where: { aziendaId },
-      orderBy: { data: 'desc' },
-      include: {
-        socio: true,
-        movimenti: { select: { id: true, tipo: true, importo: true, categoria: true, descrizione: true } },
-      },
-    })
-    return NextResponse.json(data)
+
+    const [liquidazioni, casse] = await Promise.all([
+      prisma.liquidazioniSoci.findMany({
+        where: { aziendaId },
+        orderBy: { data: 'desc' },
+        include: {
+          socio: { select: { id: true, nome: true, cognome: true } },
+          movimenti: { select: { id: true, tipo: true, importo: true, categoria: true, descrizione: true } },
+          movimentoCassa: { select: { id: true, importo: true, tipo: true, data: true } },
+        },
+      }),
+      prisma.casseInterne.findMany({
+        where: { aziendaId },
+        include: { movimenti: { select: { tipo: true, importo: true } } },
+      }),
+    ])
+
+    const saldoCassa = casse.reduce((acc, c) => {
+      const movimentato = c.movimenti.reduce((a, m) => m.tipo === 'entrata' ? a + m.importo : a - m.importo, 0)
+      return acc + c.saldoIniziale + movimentato
+    }, 0)
+
+    return NextResponse.json({ liquidazioni, saldoCassa })
   } catch {
     return NextResponse.json({ error: 'Errore nel recupero liquidazioni' }, { status: 500 })
   }

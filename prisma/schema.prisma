@@ -320,6 +320,8 @@ model MovimentiCassa {
   creatoIl      DateTime @default(now())
   aziendaId     Int
   azienda       Azienda  @relation(fields: [aziendaId], references: [id])
+  movimentiSoci  MovimentiSoci[]
+  liquidazioni   LiquidazioniSoci[]
 }
 
 model MovimentiSoci {
@@ -334,6 +336,8 @@ model MovimentiSoci {
   liquidato       Boolean  @default(false)
   liquidazioneId  Int?
   liquidazione    LiquidazioniSoci? @relation(fields: [liquidazioneId], references: [id])
+  movimentoCassaId Int?
+  movimentoCassa  MovimentiCassa? @relation(fields: [movimentoCassaId], references: [id])
   creatoIl        DateTime @default(now())
   aziendaId       Int
   azienda         Azienda  @relation(fields: [aziendaId], references: [id])
@@ -356,6 +360,8 @@ model LiquidazioniSoci {
   aziendaId     Int
   azienda       Azienda  @relation(fields: [aziendaId], references: [id])
   movimenti     MovimentiSoci[]
+  movimentoCassaId Int?
+  movimentoCassa  MovimentiCassa? @relation(fields: [movimentoCassaId], references: [id])
 }
 
 model DebitiAperti {

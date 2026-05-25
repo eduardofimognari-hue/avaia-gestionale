@@ -5,5 +5,5 @@ export default withAuth({
 })
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/anagrafiche/:path*', '/vendite/:path*', '/listino/:path*', '/magazzino/:path*', '/contabilita/:path*', '/raccolta/:path*', '/documenti/:path*', '/lavoro-soci/:path*', '/cassa/:path*', '/movimenti-soci/:path*', '/liquidazioni-soci/:path*', '/debiti/:path*', '/utenti/:path*'],
+  matcher: ['/dashboard/:path*', '/anagrafiche/:path*', '/vendite/:path*', '/listino/:path*', '/magazzino/:path*', '/contabilita/:path*', '/raccolta/:path*', '/documenti/:path*', '/lavoro-soci/:path*', '/movimenti-soci/:path*', '/liquidazioni-soci/:path*', '/debiti/:path*', '/utenti/:path*'],
 }
