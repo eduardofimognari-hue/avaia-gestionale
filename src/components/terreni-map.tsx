@@ -116,19 +116,20 @@ export function TerreniMap({
     const map = L.map(containerRef.current, {
       center: [initialCenter.lat, initialCenter.lng],
       zoom: 14,
+      maxZoom: 19,
       zoomControl: true,
     })
 
     const satellite = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { attribution: '© Esri', maxZoom: 20 }
+      { attribution: '© Esri', maxZoom: 19 }
     )
     const street = L.tileLayer(
       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19 }
     )
-    street.addTo(map)
-    L.control.layers({ '🗺️ Mappa': street, '🛰️ Satellite': satellite }, {}, { position: 'topright' }).addTo(map)
+    satellite.addTo(map)
+    L.control.layers({ '🛰️ Satellite': satellite, '🗺️ Mappa': street }, {}, { position: 'topright' }).addTo(map)
 
     map.on('click', (e: L.LeafletMouseEvent) => {
       // Deseleziona se clicco su area vuota della mappa
