@@ -116,6 +116,7 @@ export function TerreniMap({
     const map = L.map(containerRef.current, {
       center: [initialCenter.lat, initialCenter.lng],
       zoom: 14,
+      maxZoom: 18,
       zoomControl: true,
     })
 
