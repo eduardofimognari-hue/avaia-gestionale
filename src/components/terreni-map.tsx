@@ -1,8 +1,7 @@
 'use client'
-import { useRef, useCallback, useEffect } from 'react'
-import { GoogleMap, useJsApiLoader, Polygon, OverlayView } from '@react-google-maps/api'
-
-const MAP_ID = 'terreni-map'
+import { useEffect, useRef } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 const DEFAULT_CATEGORY_COLORS: Record<string, { fill: string; stroke: string }> = {
   api: { fill: '#eab308', stroke: '#ca8a04' },
@@ -15,15 +14,10 @@ const DEFAULT_CATEGORY_COLORS: Record<string, { fill: string; stroke: string }> 
 const DEFAULT_COLOR = { fill: '#22c55e', stroke: '#16a34a' }
 
 const CATEGORY_EMOJI: Record<string, string> = {
-  api: '🐝',
-  frutta: '🍎',
-  ortaggi: '🥬',
-  olio: '🫒',
-  trasformato: '🏺',
-  altro: '🌿',
+  api: '🐝', frutta: '🍎', ortaggi: '🥬', olio: '🫒', trasformato: '🏺', altro: '🌿',
 }
 
-interface PolygonPath {
+interface PolygonData {
   paths: { lat: number; lng: number }[]
   id?: string
   category?: string
@@ -31,7 +25,7 @@ interface PolygonPath {
 }
 
 interface TerreniMapProps {
-  polygons: PolygonPath[]
+  polygons: PolygonData[]
   initialCenter: { lat: number; lng: number }
   onMapClick?: (lat: number, lng: number) => void
   onPolygonSelect?: (id: string | null) => void
@@ -41,18 +35,6 @@ interface TerreniMapProps {
   prodottoEmojiMap?: Record<number, string>
 }
 
-function computeBounds(paths: { lat: number; lng: number }[]) {
-  let minLat = Infinity, maxLat = -Infinity
-  let minLng = Infinity, maxLng = -Infinity
-  for (const p of paths) {
-    if (p.lat < minLat) minLat = p.lat
-    if (p.lat > maxLat) maxLat = p.lat
-    if (p.lng < minLng) minLng = p.lng
-    if (p.lng > maxLng) maxLng = p.lng
-  }
-  return { minLat, maxLat, minLng, maxLng }
-}
-
 function centroid(paths: { lat: number; lng: number }[]) {
   if (!paths.length) return { lat: 0, lng: 0 }
   const n = paths.length
@@ -60,6 +42,20 @@ function centroid(paths: { lat: number; lng: number }[]) {
     lat: paths.reduce((a, p) => a + p.lat, 0) / n,
     lng: paths.reduce((a, p) => a + p.lng, 0) / n,
   }
+}
+
+function getEmojis(poly: PolygonData, prodottoEmojiMap: Record<number, string>): string[] {
+  if (poly.prodottoIds?.length) {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const pid of poly.prodottoIds) {
+      const e = prodottoEmojiMap[pid]
+      if (e && !seen.has(e)) { seen.add(e); result.push(e) }
+    }
+    if (result.length) return result
+  }
+  const catEmoji = CATEGORY_EMOJI[poly.category || '']
+  return catEmoji ? [catEmoji] : ['🌿']
 }
 
 export function TerreniMap({
@@ -72,164 +68,167 @@ export function TerreniMap({
   categoryColors = DEFAULT_CATEGORY_COLORS,
   prodottoEmojiMap = {},
 }: TerreniMapProps) {
-  const mapRef = useRef<google.maps.Map | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<L.Map | null>(null)
+  const polyLayersRef = useRef<L.Polygon[]>([])
+  const markerLayersRef = useRef<L.Marker[]>([])
+  const drawingPolyRef = useRef<L.Polygon | null>(null)
   const initializedRef = useRef(false)
-  const prevFocusRef = useRef<string | null>(null)
 
-  const { isLoaded } = useJsApiLoader({
-    id: MAP_ID,
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-  })
+  // Callback refs to avoid stale closures in event handlers
+  const onMapClickRef = useRef(onMapClick)
+  const onPolygonSelectRef = useRef(onPolygonSelect)
+  useEffect(() => { onMapClickRef.current = onMapClick }, [onMapClick])
+  useEffect(() => { onPolygonSelectRef.current = onPolygonSelect }, [onPolygonSelect])
 
-  const onLoad = useCallback((map: google.maps.Map) => {
-    mapRef.current = map
-    if (!initializedRef.current) {
-      if (polygons.length > 0) {
-        const allPaths = polygons.flatMap(p => p.paths)
-        const b = computeBounds(allPaths)
-        const bounds = new google.maps.LatLngBounds()
-        bounds.extend({ lat: b.minLat, lng: b.minLng })
-        bounds.extend({ lat: b.maxLat, lng: b.maxLng })
-        map.fitBounds(bounds)
-      } else {
-        map.setCenter(initialCenter)
-        map.setZoom(13)
+  // Initialize map once on mount
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return
+
+    const map = L.map(containerRef.current, {
+      center: [initialCenter.lat, initialCenter.lng],
+      zoom: 14,
+      zoomControl: true,
+    })
+
+    // Satellite layer — Esri World Imagery, completamente gratuito, no API key
+    const satellite = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {
+        attribution: '© Esri — Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, GIS User Community',
+        maxZoom: 20,
       }
-      initializedRef.current = true
+    )
+
+    // Street layer — OpenStreetMap, gratuito
+    const street = L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }
+    )
+
+    satellite.addTo(map)
+    L.control.layers({ '🛰️ Satellite': satellite, '🗺️ Mappa': street }, {}, { position: 'topright' }).addTo(map)
+
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      onMapClickRef.current?.(e.latlng.lat, e.latlng.lng)
+    })
+
+    mapRef.current = map
+
+    return () => {
+      map.remove()
+      mapRef.current = null
+      polyLayersRef.current = []
+      markerLayersRef.current = []
+      drawingPolyRef.current = null
+      initializedRef.current = false
     }
-  }, [initialCenter, polygons])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onUnmount = useCallback(() => {
-    mapRef.current = null
-    initializedRef.current = false
-  }, [])
-
+  // Fit to all polygons on first data load
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !focusPolygonId || focusPolygonId === prevFocusRef.current) return
-    prevFocusRef.current = focusPolygonId
+    if (!map || initializedRef.current || polygons.length === 0) return
+    initializedRef.current = true
+    const allLatLngs = polygons.flatMap(p => p.paths.map(pt => [pt.lat, pt.lng] as L.LatLngTuple))
+    if (allLatLngs.length > 0) map.fitBounds(allLatLngs, { padding: [40, 40] })
+  }, [polygons])
+
+  // Redraw all polygons whenever data or colors change
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    polyLayersRef.current.forEach(p => p.remove())
+    markerLayersRef.current.forEach(m => m.remove())
+    polyLayersRef.current = []
+    markerLayersRef.current = []
+
+    for (const poly of polygons) {
+      const color = categoryColors[poly.category || ''] || DEFAULT_COLOR
+      const isFocused = focusPolygonId === poly.id
+      const latlngs = poly.paths.map(p => [p.lat, p.lng] as L.LatLngTuple)
+
+      const leafletPoly = L.polygon(latlngs, {
+        color: isFocused ? '#1d4ed8' : color.stroke,
+        weight: isFocused ? 3 : 2,
+        fillColor: color.fill,
+        fillOpacity: isFocused ? 0.55 : 0.35,
+      }).addTo(map)
+
+      leafletPoly.on('click', (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(e)
+        onPolygonSelectRef.current?.(poly.id || null)
+      })
+
+      polyLayersRef.current.push(leafletPoly)
+
+      // Emoji label at centroid
+      const c = centroid(poly.paths)
+      const emojis = getEmojis(poly, prodottoEmojiMap)
+      const emojiHtml = emojis.length === 1
+        ? `<span style="font-size:24px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.7))">${emojis[0]}</span>`
+        : `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;max-width:60px;background:rgba(255,255,255,0.88);border-radius:8px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.25)">${emojis.map(e => `<span style="font-size:18px;line-height:1.2">${e}</span>`).join('')}</div>`
+
+      const icon = L.divIcon({
+        html: `<div style="transform:translate(-50%,-50%);cursor:pointer;pointer-events:auto">${emojiHtml}</div>`,
+        className: '',
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      })
+
+      const marker = L.marker([c.lat, c.lng], { icon, interactive: true }).addTo(map)
+      marker.on('click', () => onPolygonSelectRef.current?.(poly.id || null))
+      markerLayersRef.current.push(marker)
+    }
+  }, [polygons, focusPolygonId, categoryColors, prodottoEmojiMap])
+
+  // Drawing preview polygon (tratteggiato, aggiornato ad ogni nuovo vertice)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (drawingPolyRef.current) {
+      drawingPolyRef.current.remove()
+      drawingPolyRef.current = null
+    }
+
+    if (drawingVertices && drawingVertices.length > 1) {
+      const latlngs = drawingVertices.map(v => [v.lat, v.lng] as L.LatLngTuple)
+      drawingPolyRef.current = L.polygon(latlngs, {
+        color: '#d97706',
+        weight: 2,
+        dashArray: '8 5',
+        fillColor: '#f59e0b',
+        fillOpacity: 0.2,
+        interactive: false,
+      }).addTo(map)
+    }
+  }, [drawingVertices])
+
+  // Focus (zoom to) a specific polygon
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !focusPolygonId) return
     const poly = polygons.find(p => p.id === focusPolygonId)
     if (!poly?.paths?.length) return
-    const b = computeBounds(poly.paths)
-    const bounds = new google.maps.LatLngBounds()
-    bounds.extend({ lat: b.minLat, lng: b.minLng })
-    bounds.extend({ lat: b.maxLat, lng: b.maxLng })
-    map.fitBounds(bounds)
+    const latlngs = poly.paths.map(p => [p.lat, p.lng] as L.LatLngTuple)
+    map.fitBounds(latlngs, { padding: [60, 60] })
   }, [focusPolygonId, polygons])
 
-  if (!isLoaded) return <div className="w-full h-[400px] rounded-xl border bg-gray-50 flex items-center justify-center text-gray-400">Caricamento mappa Google...</div>
-
-  const getPolygonEmojis = (poly: PolygonPath): string[] => {
-    const emojis: string[] = []
-    if (poly.prodottoIds?.length) {
-      const seen = new Set<string>()
-      for (const pid of poly.prodottoIds) {
-        const e = prodottoEmojiMap[pid]
-        if (e && !seen.has(e)) { seen.add(e); emojis.push(e) }
-      }
-    }
-    if (emojis.length === 0) {
-      const e = CATEGORY_EMOJI[poly.category || '']
-      if (e) emojis.push(e)
-    }
-    if (emojis.length === 0) emojis.push('🌿')
-    return emojis
-  }
+  const isDrawing = drawingVertices !== undefined
 
   return (
-    <GoogleMap
-      mapContainerClassName="w-full h-[400px] rounded-xl"
-      onLoad={onLoad}
-      onUnmount={onUnmount}
-      onClick={(e) => { if (e.latLng && onMapClick) onMapClick(e.latLng.lat(), e.latLng.lng()) }}
-      options={{
-        mapTypeControl: true,
-        streetViewControl: false,
-        fullscreenControl: false,
-        zoomControl: true,
-        mapTypeId: 'satellite',
-        gestureHandling: 'greedy',
+    <div
+      ref={containerRef}
+      className="w-full h-[480px] rounded-xl"
+      style={{
+        zIndex: 0,
+        cursor: isDrawing ? 'crosshair' : 'grab',
       }}
-    >
-      {polygons.map((poly, idx) => {
-        const color = categoryColors[poly.category || ''] || DEFAULT_COLOR
-        const isFocused = focusPolygonId === poly.id
-        return (
-          <Polygon
-            key={poly.id || idx}
-            paths={poly.paths}
-            options={{
-              fillColor: color.fill,
-              fillOpacity: isFocused ? 0.5 : 0.35,
-              strokeColor: isFocused ? '#000' : color.stroke,
-              strokeWeight: isFocused ? 3 : 2,
-              clickable: true,
-            }}
-            onClick={() => onPolygonSelect?.(poly.id || null)}
-          />
-        )
-      })}
-      {polygons.map((poly, idx) => {
-        if (!poly.paths?.length) return null
-        const c = centroid(poly.paths)
-        const emojis = getPolygonEmojis(poly)
-        return (
-          <OverlayView
-            key={`marker-${poly.id || idx}`}
-            position={c}
-            mapPaneName={OverlayView.OVERLAY_LAYER}
-          >
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '1px',
-                transform: 'translate(-50%, -50%)',
-                cursor: 'pointer',
-                pointerEvents: 'auto',
-              }}
-              onClick={() => onPolygonSelect?.(poly.id || null)}
-            >
-              {emojis.length === 1 ? (
-                <span style={{ fontSize: '26px', lineHeight: '1', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.6))' }}>
-                  {emojis[0]}
-                </span>
-              ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    justifyContent: 'center',
-                    gap: '2px',
-                    maxWidth: '64px',
-                    background: 'rgba(255,255,255,0.85)',
-                    borderRadius: '8px',
-                    padding: '3px 5px',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                  }}
-                >
-                  {emojis.map((e, i) => (
-                    <span key={i} style={{ fontSize: '18px', lineHeight: '1.2' }}>{e}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </OverlayView>
-        )
-      })}
-      {drawingVertices && drawingVertices.length > 1 && (
-        <Polygon
-          paths={drawingVertices}
-          options={{
-            fillColor: '#f59e0b',
-            fillOpacity: 0.25,
-            strokeColor: '#d97706',
-            strokeWeight: 2,
-            clickable: false,
-          }}
-        />
-      )}
-    </GoogleMap>
+    />
   )
 }

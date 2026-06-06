@@ -13,7 +13,7 @@ import dynamic from 'next/dynamic'
 
 const TerreniMap = dynamic(() => import('@/components/terreni-map').then(m => m.TerreniMap), {
   ssr: false,
-  loading: () => <div className="w-full h-[400px] rounded-xl border bg-gray-50 flex items-center justify-center text-gray-400">Caricamento mappa Google...</div>,
+  loading: () => <div className="w-full h-[480px] rounded-xl border bg-gray-50 flex items-center justify-center text-gray-400">Caricamento mappa...</div>,
 })
 
 type PolygonPath = { lat: number; lng: number }
