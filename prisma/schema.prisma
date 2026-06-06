@@ -51,6 +51,7 @@ model Ruoli {
   aziendaId Int
   azienda   Azienda @relation(fields: [aziendaId], references: [id])
   @@unique([nome, aziendaId])
+  @@index([aziendaId])
 }
 
 model SociRuoli {
@@ -79,6 +80,7 @@ model Utente {
   creatoIl  DateTime @default(now())
   aziendaId Int
   azienda   Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
 }
 
 model Soci {
@@ -104,6 +106,8 @@ model Soci {
   tariffe        TariffeLavoro[]
   responsabilita SociAreeResponsabilita[]
   ruoli          SociRuoli[]
+  @@index([aziendaId])
+  @@index([aziendaId, attivo])
 }
 
 model Aree {
@@ -118,6 +122,7 @@ model Aree {
   tariffe     TariffeLavoro[]
   responsabili SociAreeResponsabilita[]
   @@unique([nome, aziendaId])
+  @@index([aziendaId])
 }
 
 model Luoghi {
@@ -144,6 +149,7 @@ model Luoghi {
   raccolte    Raccolta[]
   vendite     Vendite[]
   apiario     Apiario[]
+  @@index([aziendaId])
 }
 
 model Terreni {
@@ -167,6 +173,7 @@ model Terreni {
   creatoIl      DateTime  @default(now())
   luoghi        Luoghi[]
   @@unique([nome, aziendaId])
+  @@index([aziendaId])
 }
 
 model Apiario {
@@ -182,6 +189,7 @@ model Apiario {
   creatoIl          DateTime @default(now())
   aziendaId         Int
   azienda           Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
 }
 
 model Fornitori {
@@ -204,6 +212,7 @@ model Fornitori {
   creatoIl      DateTime        @default(now())
   debiti        DebitiAperti[]
   attrezzature  Attrezzature[]
+  @@index([aziendaId])
 }
 
 model Attrezzature {
@@ -222,6 +231,7 @@ model Attrezzature {
   azienda       Azienda   @relation(fields: [aziendaId], references: [id])
   creatoIl      DateTime  @default(now())
   @@unique([nome, aziendaId])
+  @@index([aziendaId])
 }
 
 model Clienti {
@@ -247,6 +257,8 @@ model Clienti {
   vendite       Vendite[]
   documenti     Documenti[]
   liquidazioni  LiquidazioniSoci[]
+  @@index([aziendaId])
+  @@index([aziendaId, attivo])
 }
 
 model Prodotti {
@@ -268,6 +280,8 @@ model Prodotti {
   produzioni      ProduzioniInput[]
   righeVendita    RigheVendita[]
   raccolte        Raccolta[]
+  @@index([aziendaId])
+  @@index([aziendaId, attivo])
 }
 
 model ListinoPrezzi {
@@ -286,6 +300,8 @@ model ListinoPrezzi {
   creatoIl     DateTime @default(now())
   aziendaId    Int
   azienda      Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
+  @@index([aziendaId, anno])
 }
 
 model ParametriCostoLavoro {
@@ -299,6 +315,7 @@ model ParametriCostoLavoro {
   creatoIl    DateTime @default(now())
   aziendaId   Int
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
 }
 
 model Raccolta {
@@ -316,6 +333,8 @@ model Raccolta {
   creatoIl    DateTime @default(now())
   aziendaId   Int
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
+  @@index([aziendaId, data])
 }
 
 model MovimentiInput {
@@ -330,6 +349,9 @@ model MovimentiInput {
   creatoIl        DateTime @default(now())
   aziendaId       Int
   azienda         Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
+  @@index([aziendaId, data])
+  @@index([aziendaId, prodottoId])
 }
 
 model LavoroSoci {
@@ -350,6 +372,9 @@ model LavoroSoci {
   creatoIl    DateTime @default(now())
   aziendaId   Int
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
+  @@index([aziendaId, socioId, liquidato])
+  @@index([aziendaId, data])
 }
 
 model TariffeLavoro {
@@ -365,6 +390,7 @@ model TariffeLavoro {
   aziendaId   Int
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
   @@unique([socioId, areaId, anno, aziendaId])
+  @@index([aziendaId])
 }
 
 model ProduzioniInput {
@@ -378,6 +404,8 @@ model ProduzioniInput {
   creatoIl        DateTime @default(now())
   aziendaId       Int
   azienda         Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
+  @@index([aziendaId, data])
 }
 
 model CasseInterne {
@@ -391,6 +419,7 @@ model CasseInterne {
   azienda     Azienda          @relation(fields: [aziendaId], references: [id])
   movimenti   MovimentiCassa[]
   @@unique([nome, aziendaId])
+  @@index([aziendaId])
 }
 
 model MovimentiCassa {
@@ -416,6 +445,9 @@ model MovimentiCassa {
   azienda       Azienda  @relation(fields: [aziendaId], references: [id])
   movimentiSoci  MovimentiSoci[]
   liquidazioni   LiquidazioniSoci[]
+  @@index([aziendaId])
+  @@index([aziendaId, data])
+  @@index([aziendaId, tipo])
 }
 
 model MovimentiSoci {
@@ -435,6 +467,9 @@ model MovimentiSoci {
   creatoIl        DateTime @default(now())
   aziendaId       Int
   azienda         Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
+  @@index([aziendaId, socioId, liquidato])
+  @@index([aziendaId, data])
 }
 
 model LiquidazioniSoci {
@@ -459,6 +494,8 @@ model LiquidazioniSoci {
   movimenti     MovimentiSoci[]
   movimentoCassaId Int?
   movimentoCassa  MovimentiCassa? @relation(fields: [movimentoCassaId], references: [id])
+  @@index([aziendaId])
+  @@index([aziendaId, stato])
 }
 
 model DebitiAperti {
@@ -480,6 +517,9 @@ model DebitiAperti {
   creatoIl    DateTime   @default(now())
   aziendaId   Int
   azienda     Azienda   @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
+  @@index([aziendaId, stato])
+  @@index([aziendaId, clienteId, stato])
 }
 
 model RegoleRipartizione {
@@ -494,6 +534,7 @@ model RegoleRipartizione {
   creatoIl              DateTime @default(now())
   aziendaId             Int
   azienda               Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
 }
 
 model Vendite {
@@ -519,6 +560,9 @@ model Vendite {
   righe       RigheVendita[]
   debiti      DebitiAperti[]
   documenti   Documenti[]
+  @@index([aziendaId])
+  @@index([aziendaId, data])
+  @@index([aziendaId, statoPagamento])
 }
 
 model Documenti {
@@ -541,6 +585,9 @@ model Documenti {
   aziendaId     Int
   azienda       Azienda  @relation(fields: [aziendaId], references: [id])
   @@unique([tipo, numero, anno, aziendaId])
+  @@index([aziendaId])
+  @@index([aziendaId, stato])
+  @@index([aziendaId, tipo, anno])
 }
 
 model Rate {
@@ -556,6 +603,8 @@ model Rate {
   creatoIl    DateTime @default(now())
   aziendaId   Int
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+  @@index([aziendaId])
+  @@index([aziendaId, pagata])
 }
 
 model RigheVendita {
@@ -569,4 +618,5 @@ model RigheVendita {
   prezzoUnitario Float
   importo     Float
   creatoIl    DateTime @default(now())
+  @@index([venditaId])
 }
