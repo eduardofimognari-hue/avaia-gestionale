@@ -156,7 +156,7 @@ export function TerreniMap({
     if (!map || initializedRef.current || polygons.length === 0) return
     initializedRef.current = true
     const all = polygons.flatMap(p => p.paths.map(pt => [pt.lat, pt.lng] as L.LatLngTuple))
-    if (all.length) map.fitBounds(all, { padding: [40, 40] })
+    if (all.length) map.fitBounds(all, { padding: [40, 40], maxZoom: 18 })
   }, [polygons])
 
   // Redraw all polygons + emoji markers
@@ -271,7 +271,7 @@ export function TerreniMap({
     if (!map || !focusPolygonId) return
     const poly = polygons.find(p => p.id === focusPolygonId)
     if (!poly?.paths?.length) return
-    map.fitBounds(poly.paths.map(p => [p.lat, p.lng] as L.LatLngTuple), { padding: [60, 60] })
+    map.fitBounds(poly.paths.map(p => [p.lat, p.lng] as L.LatLngTuple), { padding: [60, 60], maxZoom: 18 })
   }, [focusPolygonId, polygons])
 
   const isDrawing = drawingVertices !== undefined
