@@ -1,14 +1,14 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
-import Script from 'next/script'
 import './globals.css'
+import { PwaRegister } from '@/components/pwa-register'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'avaia - Gestionale',
   description: 'Gestione multi-aziendale semplice e moderna',
-  manifest: '/manifest.webmanifest',
+  manifest: '/manifest',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'avaia' },
 }
 
@@ -27,9 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={inter.className}>
         {children}
-        <Script id="sw-register" strategy="afterInteractive">
-          {`if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`}
-        </Script>
+        <PwaRegister />
       </body>
     </html>
   )

@@ -1,35 +1,23 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getCurrentAziendaId } from '@/lib/azienda-context'
-import { requireRole } from '@/lib/auth'
+import { withAzienda, withValidazione, withRuoloScrittura } from '@/lib/api-utils'
 import { listinoSchema } from '@/lib/validations'
-import { ZodError } from 'zod'
 
 export async function GET() {
-  try {
-    const aziendaId = await getCurrentAziendaId()
-    if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
+  return withAzienda(async (aziendaId) => {
     const listino = await prisma.listinoPrezzi.findMany({
       where: { aziendaId },
       orderBy: { anno: 'desc' },
       include: { prodotto: true },
     })
     return NextResponse.json(listino)
-  } catch (error) {
-    return NextResponse.json({ error: 'Errore nel recupero del listino' }, { status: 500 })
-  }
+  })
 }
 
 export async function POST(request: Request) {
-  try {
-    const aziendaId = await getCurrentAziendaId()
-    if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const check = await requireRole(['admin', 'editor'], aziendaId)
-    if (!check.allowed) return check.response!
-
-    const body = await request.json()
-    const parsed = listinoSchema.parse(body)
-
+  return withValidazione(request, listinoSchema, async (parsed, aziendaId) => {
+    const ruolo = await withRuoloScrittura(aziendaId)
+    if (!ruolo.allowed) return ruolo.response!
     const entry = await prisma.listinoPrezzi.create({
       data: {
         anno: parsed.anno, prodottoId: parsed.prodottoId, tipoCliente: parsed.tipoCliente,
@@ -40,12 +28,6 @@ export async function POST(request: Request) {
       },
       include: { prodotto: true },
     })
-
     return NextResponse.json(entry, { status: 201 })
-  } catch (error) {
-    if (error instanceof ZodError) {
-      return NextResponse.json({ error: error.errors.map(e => e.message).join(', ') }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Errore nella creazione del listino' }, { status: 500 })
-  }
+  })
 }

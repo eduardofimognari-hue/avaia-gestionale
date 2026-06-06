@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
-import { Package, Users, Handshake, Building2, Grid3x3 } from 'lucide-react'
+import { Package, Users, Handshake, Building2, Grid3x3, Wrench } from 'lucide-react'
 
 const sezioni = [
   { nome: 'Prodotti', href: '/anagrafiche/prodotti', icon: Package, desc: 'Gestione prodotti e varietà' },
   { nome: 'Clienti', href: '/anagrafiche/clienti', icon: Users, desc: 'Anagrafica clienti' },
   { nome: 'Soci', href: '/anagrafiche/soci', icon: Handshake, desc: 'Gestione soci e collaboratori' },
+  { nome: 'Attrezzature', href: '/anagrafiche/attrezzature', icon: Wrench, desc: 'Attrezzature, macchinari e materiali' },
   { nome: 'Aree di Lavoro', href: '/anagrafiche/aree', icon: Grid3x3, desc: 'Agro, Api, Amministrazione, Commerciale, Mista' },
   { nome: 'Luoghi', href: '/anagrafiche/luoghi', icon: Building2, desc: 'Luoghi e sedi' },
 ]

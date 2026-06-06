@@ -11,7 +11,7 @@ import { MapPin, Download, ArrowLeft } from 'lucide-react'
 import { formatDate, formatEuro } from '@/lib/utils'
 import Link from 'next/link'
 
-type Luogo = { id: number; nome: string; tipo: string }
+type Luogo = { id: number; nome: string; tipologia: string }
 type Movimento = {
   id: number
   data: string
@@ -85,7 +85,7 @@ export default function LuogoDetailPage() {
       <div className="no-print">
         <PageHeader
           title={luogo.nome}
-          description={`Sottocontabilità - ${luogo.tipo}`}
+          description={`Sottocontabilità - ${luogo.tipologia}`}
           action={
             <div className="flex gap-2">
               <Link href="/contabilita">
@@ -102,7 +102,7 @@ export default function LuogoDetailPage() {
         {/* Print header */}
         <div className="print-only mb-6 text-center">
           <h1 className="text-2xl font-bold">{luogo.nome}</h1>
-          <p className="text-gray-500">Sottocontabilità - {luogo.tipo}</p>
+          <p className="text-gray-500">Sottocontabilità - {luogo.tipologia}</p>
           <hr className="my-4" />
         </div>
 

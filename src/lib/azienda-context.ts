@@ -18,8 +18,7 @@ export async function getCurrentAziendaId(): Promise<number | null> {
   const session = await getServerSession(authOptions)
   if (session?.aziendaId) return session.aziendaId
 
-  const first = await prisma.azienda.findFirst({ where: { attivo: true }, orderBy: { id: 'asc' } })
-  return first?.id ?? null
+  return null
 }
 
 export async function getCurrentAzienda() {

@@ -17,8 +17,12 @@ type Socio = {
   id: number
   nome: string
   cognome: string
+  codiceFiscale: string | null
   telefono: string | null
   email: string | null
+  indirizzo: string | null
+  dataIngresso: string | null
+  note: string | null
   attivo: boolean
   responsabilita: AreaResp[]
   ruoli: RuoloAss[]
@@ -32,6 +36,8 @@ export default function SociPage() {
   const [error, setError] = useState('')
   const [aree, setAree] = useState<{ id: number; nome: string }[]>([])
   const [ruoliList, setRuoliList] = useState<{ id: number; nome: string }[]>([])
+  const [selectedItem, setSelectedItem] = useState<Socio | null>(null)
+  const [editModalOpen, setEditModalOpen] = useState(false)
   const [form, setForm] = useState({
     nome: '', cognome: '', codiceFiscale: '', telefono: '', email: '',
     indirizzo: '', dataIngresso: '', note: '',
@@ -74,6 +80,35 @@ export default function SociPage() {
     finally { setSaving(false) }
   }
 
+  function openEdit(s: Socio) {
+    setSelectedItem(s)
+    setForm({
+      nome: s.nome, cognome: s.cognome, codiceFiscale: s.codiceFiscale || '',
+      telefono: s.telefono || '', email: s.email || '', indirizzo: s.indirizzo || '',
+      dataIngresso: s.dataIngresso || '', note: s.note || '',
+      responsabilita: s.responsabilita?.map(r => r.area.id) || [],
+      ruoli: s.ruoli?.map(r => r.ruolo.id) || [],
+    })
+    setEditModalOpen(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedItem) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/soci/${selectedItem.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, dataIngresso: form.dataIngresso ? new Date(form.dataIngresso).toISOString() : null })
+      })
+      if (!res.ok) throw new Error()
+      setEditModalOpen(false)
+      setSelectedItem(null)
+      await fetchData()
+    } catch { setError('Errore durante il salvataggio') }
+    finally { setSaving(false) }
+  }
+
   return (
     <div>
       <PageHeader title="Soci" description="Gestione soci e collaboratori" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuovo Socio</Button>} />
@@ -89,7 +124,7 @@ export default function SociPage() {
               </Thead>
               <Tbody>
                 {data.map((s) => (
-                  <Tr key={s.id}>
+                  <Tr key={s.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openEdit(s)}>
                     <Td className="font-medium">{s.nome}</Td>
                     <Td>{s.cognome}</Td>
                     <Td>
@@ -117,6 +152,58 @@ export default function SociPage() {
           </CardContent>
         </Card>
       )}
+      <Modal open={editModalOpen} onClose={() => { setEditModalOpen(false); setSelectedItem(null) }} title={`Modifica Socio - ${selectedItem?.nome} ${selectedItem?.cognome}`}>
+        {selectedItem && (
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="text-sm font-medium block mb-1">Nome</label><Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required /></div>
+              <div><label className="text-sm font-medium block mb-1">Cognome</label><Input value={form.cognome} onChange={(e) => setForm({ ...form, cognome: e.target.value })} required /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="text-sm font-medium block mb-1">Codice Fiscale</label><Input value={form.codiceFiscale} onChange={(e) => setForm({ ...form, codiceFiscale: e.target.value })} /></div>
+              <div><label className="text-sm font-medium block mb-1">Telefono</label><Input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></div>
+            </div>
+            <div><label className="text-sm font-medium block mb-1">Email</label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+            <div><label className="text-sm font-medium block mb-1">Indirizzo</label><Input value={form.indirizzo} onChange={(e) => setForm({ ...form, indirizzo: e.target.value })} /></div>
+            <div><label className="text-sm font-medium block mb-1">Ruoli</label>
+              <div className="flex flex-wrap gap-3 mt-1">
+                {ruoliList.map(r => (
+                  <label key={r.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input type="checkbox" checked={form.ruoli.includes(r.id)}
+                      onChange={(e) => setForm({
+                        ...form,
+                        ruoli: e.target.checked ? [...form.ruoli, r.id] : form.ruoli.filter((id: number) => id !== r.id)
+                      })} />
+                    {r.nome}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div><label className="text-sm font-medium block mb-1">Responsabilità (aree di lavoro)</label>
+              <div className="flex flex-wrap gap-3 mt-1">
+                {aree.map(a => (
+                  <label key={a.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input type="checkbox" checked={form.responsabilita.includes(a.id)}
+                      onChange={(e) => setForm({
+                        ...form,
+                        responsabilita: e.target.checked ? [...form.responsabilita, a.id] : form.responsabilita.filter((id: number) => id !== a.id)
+                      })} />
+                    {a.nome}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="text-sm font-medium block mb-1">Data Ingresso</label><Input type="date" value={form.dataIngresso} onChange={(e) => setForm({ ...form, dataIngresso: e.target.value })} /></div>
+            </div>
+            <div><label className="text-sm font-medium block mb-1">Note</label><Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="secondary" onClick={() => { setEditModalOpen(false); setSelectedItem(null) }}>Annulla</Button>
+              <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Aggiorna Socio'}</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nuovo Socio">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

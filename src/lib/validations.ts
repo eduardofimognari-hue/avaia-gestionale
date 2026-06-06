@@ -50,7 +50,10 @@ export const luoghiSchema = z.object({
   comune: z.string().optional().nullable(),
   provincia: z.string().optional().nullable(),
   cap: z.string().optional().nullable(),
-  tipo: z.string().optional().default('fisico'),
+  tipologia: z.string().optional().default('reale'),
+  categoria: z.string().optional().default('produttivo'),
+  usoAziendale: z.boolean().optional().default(true),
+  terrenoId: z.number().optional().nullable(),
   note: z.string().optional().nullable(),
 })
 
@@ -102,13 +105,11 @@ export const cassaMovimentoSchema = z.object({
   stato: z.enum(['pagato', 'da_pagare', 'da_riscuotere', 'riscosso']).optional().default('pagato'),
 })
 
-export const contabilitaMovimentoSchema = cassaMovimentoSchema
-
 export const movimentiSociSchema = z.object({
   data: z.string().optional(),
   socioId: z.number({ required_error: 'Socio obbligatorio' }),
   tipo: z.enum(['credito', 'debito'], { required_error: 'Tipo non valido' }),
-  importo: z.number({ required_error: 'Importo obbligatorio' }),
+  importo: z.number({ required_error: 'Importo obbligatorio' }).positive('Importo deve essere positivo'),
   categoria: z.string().optional().nullable(),
   descrizione: z.string().optional().nullable(),
 })

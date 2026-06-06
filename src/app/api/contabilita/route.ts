@@ -1,15 +1,10 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getCurrentAziendaId } from '@/lib/azienda-context'
-import { requireRole } from '@/lib/auth'
-import { contabilitaMovimentoSchema } from '@/lib/validations'
-import { ZodError } from 'zod'
+import { withAzienda, withValidazione, withRuoloScrittura } from '@/lib/api-utils'
+import { cassaMovimentoSchema } from '@/lib/validations'
 
 export async function GET() {
-  try {
-    const aziendaId = await getCurrentAziendaId()
-    if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-
+  return withAzienda(async (aziendaId) => {
     const [casse, luoghi, movimenti, soci, movimentiSoci, posizioniSoci, vendite, documenti] = await Promise.all([
       prisma.casseInterne.findMany({
         where: { aziendaId },
@@ -20,7 +15,7 @@ export async function GET() {
         where: { aziendaId },
         include: {
           cassa: { select: { nome: true } },
-          luogo: { select: { id: true, nome: true, tipo: true } },
+          luogo: { select: { id: true, nome: true, tipologia: true } },
           socio: { select: { id: true, nome: true, cognome: true } },
         },
         orderBy: { data: 'desc' },
@@ -71,28 +66,30 @@ export async function GET() {
       })),
     ].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
 
-    const primaCassa = casse[0]
+    const debitiClienti = await prisma.debitiAperti.findMany({
+      where: { aziendaId, stato: 'aperto', tipo: 'cliente' },
+      include: { cliente: { select: { id: true, nome: true, cognome: true, ragioneSociale: true } } },
+      orderBy: { scadenza: 'asc' },
+    })
+    const debitiFornitori = await prisma.debitiAperti.findMany({
+      where: { aziendaId, stato: 'aperto', tipo: 'fornitore' },
+      include: { fornitore: { select: { id: true, nome: true, cognome: true, ragioneSociale: true } } },
+      orderBy: { scadenza: 'asc' },
+    })
 
     return NextResponse.json({
       casse, luoghi, movimenti, soci, movimentiSoci, posizioniAperte, riferimenti,
-      cassaUnica: primaCassa ? { id: primaCassa.id, nome: primaCassa.nome } : null,
+      debitiClienti, debitiFornitori,
+      cassaUnica: casse[0] ? { id: casse[0].id, nome: casse[0].nome } : null,
     })
-  } catch (error) {
-    return NextResponse.json({ error: 'Errore nel recupero dati contabilità' }, { status: 500 })
-  }
+  })
 }
 
 export async function POST(request: Request) {
-  try {
-    const aziendaId = await getCurrentAziendaId()
-    if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const check = await requireRole(['admin', 'editor'], aziendaId)
-    if (!check.allowed) return check.response!
+  return withValidazione(request, cassaMovimentoSchema, async (parsed, aziendaId) => {
+    const ruolo = await withRuoloScrittura(aziendaId)
+    if (!ruolo.allowed) return ruolo.response!
 
-    const body = await request.json()
-    const parsed = contabilitaMovimentoSchema.parse(body)
-
-    // Se cassaId non fornito, usa la prima cassa disponibile
     let cassaId = parsed.cassaId
     if (!cassaId) {
       const primaCassa = await prisma.casseInterne.findFirst({ where: { aziendaId }, orderBy: { id: 'asc' } })
@@ -102,40 +99,27 @@ export async function POST(request: Request) {
 
     const movimento = await prisma.movimentiCassa.create({
       data: {
-        data: parsed.data ? new Date(parsed.data) : new Date(),
-        cassaId,
-        aziendaId,
-        luogoId: parsed.luogoId ?? null,
-        socioId: parsed.socioId ?? null,
-        tipo: parsed.tipo,
-        tipoMovimento: parsed.tipoMovimento ?? 'altro',
-        importo: parsed.importo,
-        categoria: parsed.categoria ?? null,
+        data: parsed.data ? new Date(parsed.data) : new Date(), cassaId, aziendaId,
+        luogoId: parsed.luogoId ?? null, socioId: parsed.socioId ?? null,
+        tipo: parsed.tipo, tipoMovimento: parsed.tipoMovimento ?? 'altro',
+        importo: parsed.importo, categoria: parsed.categoria ?? null,
         descrizione: parsed.descrizione ?? null,
-        riferimento: parsed.riferimento ?? null,
-        riferimentoId: parsed.riferimentoId ?? null,
-        riferimentoTipo: parsed.riferimentoTipo ?? null,
-        stato: parsed.stato ?? 'pagato',
+        riferimento: parsed.riferimento ?? null, riferimentoId: parsed.riferimentoId ?? null,
+        riferimentoTipo: parsed.riferimentoTipo ?? null, stato: parsed.stato ?? 'pagato',
       },
       include: {
         cassa: { select: { nome: true } },
-        luogo: { select: { id: true, nome: true, tipo: true } },
+        luogo: { select: { id: true, nome: true, tipologia: true } },
         socio: { select: { id: true, nome: true, cognome: true } },
       },
     })
 
-    // Auto-generazione movimenti soci per anticipi
     if (parsed.socioId && parsed.tipoMovimento === 'anticipo_socio' && parsed.tipo === 'entrata') {
       await prisma.movimentiSoci.create({
         data: {
-          data: movimento.data,
-          socioId: parsed.socioId,
-          aziendaId,
-          tipo: 'credito',
-          importo: parsed.importo,
-          categoria: parsed.categoria ?? null,
-          descrizione: parsed.descrizione ?? `Anticipo socio: ${parsed.descrizione ?? ''}`,
-          movimentoCassaId: movimento.id,
+          data: movimento.data, socioId: parsed.socioId, aziendaId,
+          tipo: 'credito', importo: parsed.importo, categoria: parsed.categoria ?? null,
+          descrizione: `Anticipo socio: ${parsed.descrizione ?? ''}`, movimentoCassaId: movimento.id,
         },
       })
     }
@@ -143,23 +127,13 @@ export async function POST(request: Request) {
     if (parsed.socioId && parsed.tipoMovimento === 'anticipo_azienda' && parsed.tipo === 'uscita') {
       await prisma.movimentiSoci.create({
         data: {
-          data: movimento.data,
-          socioId: parsed.socioId,
-          aziendaId,
-          tipo: 'debito',
-          importo: parsed.importo,
-          categoria: parsed.categoria ?? null,
-          descrizione: parsed.descrizione ?? `Anticipo azienda: ${parsed.descrizione ?? ''}`,
-          movimentoCassaId: movimento.id,
+          data: movimento.data, socioId: parsed.socioId, aziendaId,
+          tipo: 'debito', importo: parsed.importo, categoria: parsed.categoria ?? null,
+          descrizione: `Anticipo azienda: ${parsed.descrizione ?? ''}`, movimentoCassaId: movimento.id,
         },
       })
     }
 
     return NextResponse.json(movimento, { status: 201 })
-  } catch (error) {
-    if (error instanceof ZodError) {
-      return NextResponse.json({ error: error.errors.map(e => e.message).join(', ') }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Errore nella creazione movimento' }, { status: 500 })
-  }
+  })
 }

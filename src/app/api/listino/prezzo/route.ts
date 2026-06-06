@@ -9,19 +9,11 @@ export async function GET(request: NextRequest) {
     const prodottoId = Number(searchParams.get('prodottoId'))
     const tipoCliente = searchParams.get('tipoCliente') || 'Privato'
     const formato = searchParams.get('formato') || 'kg'
-
-    if (!prodottoId) {
-      return NextResponse.json({ prezzo: 0 })
-    }
-
+    if (!prodottoId) return NextResponse.json({ prezzo: 0 })
     const entry = await prisma.listinoPrezzi.findFirst({
-      where: {
-        prodottoId, tipoCliente, formato, attivo: true,
-        ...(aziendaId ? { aziendaId } : {}),
-      },
+      where: { prodottoId, tipoCliente, formato, attivo: true, ...(aziendaId ? { aziendaId } : {}) },
       orderBy: { anno: 'desc' },
     })
-
     return NextResponse.json({ prezzo: entry?.prezzoBase ?? 0 })
   } catch {
     return NextResponse.json({ prezzo: 0 })

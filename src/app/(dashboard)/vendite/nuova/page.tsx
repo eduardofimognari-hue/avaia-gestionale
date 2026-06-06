@@ -5,22 +5,30 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { PageHeader } from '@/components/layout/page-header'
-import { Trash2, Plus, ArrowLeft } from 'lucide-react'
+import { Trash2, Plus, ArrowLeft, FileText, Receipt } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 interface Prodotto { id: number; nome: string; varietaTipologia: string | null; tipo: string }
 interface Cliente { id: number; nome: string; cognome: string | null; tipo: string }
+interface Luogo { id: number; nome: string }
 interface Riga { prodottoId: number; prodottoNome: string; formato: string; quantita: number; prezzoUnitario: number; disponibile: number }
 
 export default function NuovaVenditaPage() {
   const router = useRouter()
   const [prodotti, setProdotti] = useState<Prodotto[]>([])
   const [clienti, setClienti] = useState<Cliente[]>([])
+  const [luoghi, setLuoghi] = useState<Luogo[]>([])
   const [clienteId, setClienteId] = useState('')
   const [tipoCliente, setTipoCliente] = useState('Privato')
   const [data, setData] = useState(new Date().toISOString().split('T')[0])
+  const [luogoId, setLuogoId] = useState('')
+  const [statoFattura, setStatoFattura] = useState('non_fatturato')
+  const [metodoPagamento, setMetodoPagamento] = useState('contanti')
+  const [rateizzato, setRateizzato] = useState(false)
+  const [numeroRate, setNumeroRate] = useState(3)
+  const [dataPagamentoPrevista, setDataPagamentoPrevista] = useState('')
   const [righe, setRighe] = useState<Riga[]>([{ prodottoId: 0, prodottoNome: '', formato: 'kg', quantita: 1, prezzoUnitario: 0, disponibile: 0 }])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -29,9 +37,11 @@ export default function NuovaVenditaPage() {
     Promise.all([
       fetch('/api/prodotti').then(r => r.json()),
       fetch('/api/clienti').then(r => r.json()),
-    ]).then(([p, c]) => {
+      fetch('/api/contabilita').then(r => r.json()),
+    ]).then(([p, c, cont]) => {
       setProdotti(p.filter((x: Prodotto) => x.tipo === 'prodotto'))
       setClienti(c)
+      setLuoghi(cont.luoghi || [])
     })
   }, [])
 
@@ -55,13 +65,7 @@ export default function NuovaVenditaPage() {
     const p = prodotti.find(x => x.id === prodottoId)
     if (!p) return
     const righe2 = [...righe]
-    righe2[idx] = {
-      ...righe2[idx],
-      prodottoId,
-      prodottoNome: `${p.nome}${p.varietaTipologia ? ' - ' + p.varietaTipologia : ''}`,
-      prezzoUnitario: 0,
-      disponibile: 0,
-    }
+    righe2[idx] = { ...righe2[idx], prodottoId, prodottoNome: `${p.nome}${p.varietaTipologia ? ' - ' + p.varietaTipologia : ''}`, prezzoUnitario: 0, disponibile: 0 }
     setRighe(righe2)
     const [prezzo, disp] = await Promise.all([
       cercaPrezzo(prodottoId, righe2[idx].formato, tipoCliente),
@@ -79,11 +83,9 @@ export default function NuovaVenditaPage() {
     const righe2 = [...righe]
     const r = righe2[idx]
     if (field === 'prodottoId') r.prodottoId = Number(value)
-    else if (field === 'prodottoNome') r.prodottoNome = String(value)
     else if (field === 'formato') r.formato = String(value)
     else if (field === 'quantita') r.quantita = Number(value)
     else if (field === 'prezzoUnitario') r.prezzoUnitario = Number(value)
-    else if (field === 'disponibile') r.disponibile = Number(value)
     if (field === 'formato' && r.prodottoId) {
       const prezzo = await cercaPrezzo(r.prodottoId, r.formato, tipoCliente)
       r.prezzoUnitario = prezzo
@@ -92,21 +94,29 @@ export default function NuovaVenditaPage() {
   }
 
   const totale = righe.reduce((s, r) => s + r.quantita * r.prezzoUnitario, 0)
+  const importoRata = rateizzato && numeroRate > 0 ? totale / numeroRate : 0
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
+      const body: any = {
+        data,
+        clienteId: clienteId ? Number(clienteId) : null,
+        tipoCliente,
+        luogoId: luogoId ? Number(luogoId) : null,
+        statoFattura,
+        metodoPagamento: rateizzato ? 'rate' : metodoPagamento,
+        rateizzato,
+        numeroRate: rateizzato ? numeroRate : null,
+        dataPagamentoPrevista: dataPagamentoPrevista || null,
+        righe: righe.map(r => ({ prodottoId: r.prodottoId, formato: r.formato, quantita: r.quantita, prezzoUnitario: r.prezzoUnitario })),
+      }
       const res = await fetch('/api/vendite/nuova', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data,
-          clienteId: clienteId ? Number(clienteId) : null,
-          tipoCliente,
-          righe: righe.map(r => ({ prodottoId: r.prodottoId, formato: r.formato, quantita: r.quantita, prezzoUnitario: r.prezzoUnitario })),
-        }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error('Errore nel salvataggio')
       router.push('/vendite')
@@ -151,6 +161,70 @@ export default function NuovaVenditaPage() {
                 </Select>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Luogo di riferimento (sottocassa)</Label>
+                <Select value={luogoId} onChange={e => setLuogoId(e.target.value)}>
+                  <option value="">-- Nessuno --</option>
+                  {luoghi.map(l => <option key={l.id} value={l.id}>{l.nome}</option>)}
+                </Select>
+                <p className="text-[10px] text-gray-400">Non compare in fattura, usato per la contabilità interna</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Stato fatturazione</Label>
+                <Select value={statoFattura} onChange={e => setStatoFattura(e.target.value)}>
+                  <option value="non_fatturato">Non fatturata</option>
+                  <option value="ddt">Con DDT</option>
+                  <option value="fatturato">Con Fattura</option>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><h3 className="font-semibold">Pagamento</h3></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Metodo pagamento</Label>
+                <Select value={metodoPagamento} onChange={e => setMetodoPagamento(e.target.value)} disabled={rateizzato}>
+                  <option value="contanti">Contanti</option>
+                  <option value="bonifico">Bonifico</option>
+                  <option value="carta">Carta di credito/debito</option>
+                  <option value="assegno">Assegno</option>
+                  <option value="paypal">PayPal</option>
+                  <option value="satispay">Satispay</option>
+                  <option value="altro">Altro</option>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Data pagamento prevista</Label>
+                <Input type="date" value={dataPagamentoPrevista} onChange={e => setDataPagamentoPrevista(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <input type="checkbox" id="rateizzato" checked={rateizzato}
+                onChange={e => setRateizzato(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              <Label htmlFor="rateizzato">Pagamento rateale</Label>
+            </div>
+            {rateizzato && (
+              <div className="grid grid-cols-3 gap-4 pl-6">
+                <div className="space-y-2">
+                  <Label>Numero rate</Label>
+                  <Input type="number" min={2} max={60} value={numeroRate} onChange={e => setNumeroRate(parseInt(e.target.value) || 3)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Importo per rata</Label>
+                  <p className="h-10 flex items-center text-sm font-medium">€ {importoRata.toFixed(2)}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Totale</Label>
+                  <p className="h-10 flex items-center text-sm font-medium">€ {totale.toFixed(2)}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -213,6 +287,28 @@ export default function NuovaVenditaPage() {
             </div>
           </CardContent>
         </Card>
+
+        {statoFattura !== 'non_fatturato' && (
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                {statoFattura === 'ddt' ? <FileText className="w-5 h-5 text-blue-600" /> : <Receipt className="w-5 h-5 text-green-600" />}
+                <h3 className="font-semibold">{statoFattura === 'ddt' ? 'Bozza DDT' : 'Bozza Fattura'}</h3>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600">
+                {statoFattura === 'ddt'
+                  ? 'Al salvataggio verrà generata una bozza di DDT modificabile. Potrai confermare il DDT ed emettere fattura in un secondo momento dalla pagina DDT / Fatture.'
+                  : 'Al salvataggio verrà generata direttamente una fattura con numerazione sequenziale automatica.'}
+              </p>
+              <div className="mt-2 text-xs text-gray-500">
+                <p>• Documento numerato automaticamente in ordine crescente per anno</p>
+                <p>• I dati possono essere modificati fino alla conferma finale</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex gap-3 justify-end">
           <Link href="/vendite"><Button type="button" variant="outline">Annulla</Button></Link>

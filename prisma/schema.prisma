@@ -36,6 +36,11 @@ model Azienda {
   parametriCostoLavoro  ParametriCostoLavoro[]
   raccolte              Raccolta[]
   documenti             Documenti[]
+  terreni               Terreni[]
+  fornitori             Fornitori[]
+  rate                  Rate[]
+  apiario               Apiario[]
+  attrezzature          Attrezzature[]
 }
 
 model Ruoli {
@@ -122,7 +127,11 @@ model Luoghi {
   comune      String?
   provincia   String?
   cap         String?
-  tipo        String                @default("fisico")
+  tipologia   String                @default("reale")
+  categoria   String                @default("produttivo")
+  usoAziendale Boolean              @default(true)
+  terrenoId   Int?
+  terreno     Terreni?              @relation(fields: [terrenoId], references: [id], onDelete: SetNull)
   note        String?
   attivo      Boolean               @default(true)
   creatoIl    DateTime              @default(now())
@@ -133,6 +142,86 @@ model Luoghi {
   ripartizioneDestinazione RegoleRipartizione[] @relation("Destinazione")
   lavoriSoci  LavoroSoci[]
   raccolte    Raccolta[]
+  vendite     Vendite[]
+  apiario     Apiario[]
+}
+
+model Terreni {
+  id            Int       @id @default(autoincrement())
+  nome          String
+  superficie    Float?
+  unitaMisura   String    @default("ha")
+  indirizzo     String?
+  comune        String?
+  provincia     String?
+  cap           String?
+  latitudine    Float?
+  longitudine   Float?
+  googleMapsUrl String?
+  confine       Json?
+  prodottiIds   Json?
+  note          String?
+  attivo        Boolean   @default(true)
+  aziendaId     Int
+  azienda       Azienda   @relation(fields: [aziendaId], references: [id])
+  creatoIl      DateTime  @default(now())
+  luoghi        Luoghi[]
+  @@unique([nome, aziendaId])
+}
+
+model Apiario {
+  id                Int      @id @default(autoincrement())
+  nome              String
+  tipo              String   @default("arnia")
+  regina            String?
+  dataInstallazione DateTime?
+  luogoId           Int?
+  luogo             Luoghi?  @relation(fields: [luogoId], references: [id])
+  note              String?
+  stato             String   @default("attivo")
+  creatoIl          DateTime @default(now())
+  aziendaId         Int
+  azienda           Azienda  @relation(fields: [aziendaId], references: [id])
+}
+
+model Fornitori {
+  id            Int             @id @default(autoincrement())
+  nome          String
+  cognome       String?
+  ragioneSociale String?
+  partitaIva    String?
+  codiceFiscale String?
+  telefono      String?
+  email         String?
+  indirizzo     String?
+  comune        String?
+  provincia     String?
+  cap           String?
+  note          String?
+  attivo        Boolean         @default(true)
+  aziendaId     Int
+  azienda       Azienda         @relation(fields: [aziendaId], references: [id])
+  creatoIl      DateTime        @default(now())
+  debiti        DebitiAperti[]
+  attrezzature  Attrezzature[]
+}
+
+model Attrezzature {
+  id            Int       @id @default(autoincrement())
+  nome          String
+  categoria     String?
+  fornitoreId   Int?
+  fornitore     Fornitori? @relation(fields: [fornitoreId], references: [id])
+  costoUnitario Float?
+  unitaMisura   String    @default("pezzi")
+  scortaMinima  Float?
+  quantita      Float     @default(0)
+  note          String?
+  attivo        Boolean   @default(true)
+  aziendaId     Int
+  azienda       Azienda   @relation(fields: [aziendaId], references: [id])
+  creatoIl      DateTime  @default(now())
+  @@unique([nome, aziendaId])
 }
 
 model Clienti {
@@ -157,6 +246,7 @@ model Clienti {
   debiti        DebitiAperti[]
   vendite       Vendite[]
   documenti     Documenti[]
+  liquidazioni  LiquidazioniSoci[]
 }
 
 model Prodotti {
@@ -167,6 +257,7 @@ model Prodotti {
   categoria       String?
   tipo            String         @default("prodotto")
   unitaMisura     String         @default("kg")
+  aliquotaIva     Float          @default(22)
   attivo          Boolean        @default(true)
   note            String?
   creatoIl        DateTime       @default(now())
@@ -349,8 +440,11 @@ model MovimentiSoci {
 model LiquidazioniSoci {
   id            Int      @id @default(autoincrement())
   data          DateTime
-  socioId       Int
-  socio         Soci     @relation(fields: [socioId], references: [id])
+  tipo          String   @default("interna")
+  socioId       Int?
+  socio         Soci?    @relation(fields: [socioId], references: [id])
+  clienteId     Int?
+  cliente       Clienti? @relation(fields: [clienteId], references: [id])
   totaleCrediti Float    @default(0)
   totaleDebiti  Float    @default(0)
   importoNetto  Float    @default(0)
@@ -368,21 +462,24 @@ model LiquidazioniSoci {
 }
 
 model DebitiAperti {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   data        DateTime
   clienteId   Int?
-  cliente     Clienti? @relation(fields: [clienteId], references: [id])
+  cliente     Clienti?  @relation(fields: [clienteId], references: [id])
+  fornitoreId Int?
+  fornitore   Fornitori? @relation(fields: [fornitoreId], references: [id])
   importo     Float
   descrizione String?
   scadenza    DateTime?
-  stato       String   @default("aperto")
+  stato       String    @default("aperto")
   dataSaldo   DateTime?
   venditaId   Int?
-  vendita     Vendite? @relation(fields: [venditaId], references: [id])
+  vendita     Vendite?  @relation(fields: [venditaId], references: [id])
+  tipo        String    @default("cliente")
   note        String?
-  creatoIl    DateTime @default(now())
+  creatoIl    DateTime   @default(now())
   aziendaId   Int
-  azienda     Azienda  @relation(fields: [aziendaId], references: [id])
+  azienda     Azienda   @relation(fields: [aziendaId], references: [id])
 }
 
 model RegoleRipartizione {
@@ -407,6 +504,15 @@ model Vendite {
   tipoCliente String
   importoTotale Float?
   nota        String?
+  luogoId     Int?
+  luogo       Luoghi?  @relation(fields: [luogoId], references: [id])
+  statoFattura String  @default("non_fatturato")
+  metodoPagamento String?
+  rateizzato  Boolean  @default(false)
+  numeroRate  Int?
+  pagata      Boolean  @default(false)
+  dataPagamentoPrevista DateTime?
+  statoPagamento String @default("da_pagare")
   creatoIl    DateTime @default(now())
   aziendaId   Int
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
@@ -426,11 +532,30 @@ model Documenti {
   clienteId     Int?
   cliente       Clienti? @relation(fields: [clienteId], references: [id])
   importoTotale Float
+  stato         String   @default("bozza")
+  dataPagamentoPrevista DateTime?
+  dataPagamento DateTime?
+  metodoPagamento String?
   note          String?
   creatoIl      DateTime @default(now())
   aziendaId     Int
   azienda       Azienda  @relation(fields: [aziendaId], references: [id])
   @@unique([tipo, numero, anno, aziendaId])
+}
+
+model Rate {
+  id          Int      @id @default(autoincrement())
+  data        DateTime
+  importo     Float
+  scadenza    DateTime?
+  pagata      Boolean  @default(false)
+  dataPagamento DateTime?
+  riferimentoTipo String
+  riferimentoId Int
+  nota        String?
+  creatoIl    DateTime @default(now())
+  aziendaId   Int
+  azienda     Azienda  @relation(fields: [aziendaId], references: [id])
 }
 
 model RigheVendita {

@@ -1,90 +1,128 @@
-const CACHE_VERSION = 'v3'
-const STATIC_CACHE = `avaia-static-${CACHE_VERSION}`
-const API_CACHE = `avaia-api-${CACHE_VERSION}`
+const CACHE_NAME = 'avaia-cache-v1'
+const STATIC_CACHE = 'avaia-static-v1'
+const API_CACHE = 'avaia-api-v1'
 
-const staticUrls = [
-  '/',
-  '/dashboard',
-  '/login',
-  '/anagrafiche',
-  '/listino',
-  '/vendite',
-  '/magazzino',
-  '/lavoro-soci',
-  '/cassa',
-  '/movimenti-soci',
-  '/liquidazioni-soci',
-  '/debiti',
-  '/vendite/nuova',
+const STATIC_EXTENSIONS = [
+  '.js', '.css', '.png', '.svg', '.ico', '.webmanifest',
+  '.woff', '.woff2', '.ttf', '.json',
 ]
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(STATIC_CACHE).then((c) => c.addAll(staticUrls)),
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(STATIC_CACHE).then((cache) => {
+      return cache.addAll([
+        '/',
+        '/dashboard',
+        '/login',
+        '/manifest',
+        '/icons/icon-192.png',
+        '/icons/icon-512.png',
+        '/icons/icon-192.svg',
+        '/icons/icon-512.svg',
+      ])
+    })
   )
   self.skipWaiting()
 })
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    Promise.all([
-      clients.claim(),
-      caches.keys().then((keys) =>
-        Promise.all(
-          keys
-            .filter((k) => k !== STATIC_CACHE && k !== API_CACHE)
-            .map((k) => caches.delete(k))
-        ),
-      ),
-    ]),
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames
+          .filter((name) => name !== STATIC_CACHE && name !== API_CACHE && name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      )
+    })
   )
+  self.clients.claim()
 })
 
-self.addEventListener('fetch', (e) => {
-  const { request } = e
-  const url = new URL(request.url)
+function isStaticAsset(url) {
+  return STATIC_EXTENSIONS.some((ext) => url.pathname.endsWith(ext))
+}
 
-  // API calls - stale-while-revalidate
-  if (url.pathname.startsWith('/api/')) {
-    e.respondWith(
-      caches.open(API_CACHE).then((cache) =>
-        cache.match(request).then((cached) => {
-          const fetchPromise = fetch(request).then((res) => {
-            if (res.ok) {
-              cache.put(request, res.clone())
-            }
-            return res
-          }).catch(() => cached)
-          return cached || fetchPromise
-        }).catch(() =>
-          fetch(request).catch(() =>
-            new Response(JSON.stringify({ error: 'offline' }), {
-              status: 503,
-              headers: { 'Content-Type': 'application/json' },
-            })
-          )
-        ),
-      ),
-    )
-    return
+function isApiRequest(url) {
+  return url.pathname.startsWith('/api/')
+}
+
+function isNavigazione(url) {
+  return url.pathname.startsWith('/anagrafiche') ||
+         url.pathname.startsWith('/dashboard') ||
+         url.pathname.startsWith('/vendite') ||
+         url.pathname.startsWith('/listino') ||
+         url.pathname.startsWith('/magazzino') ||
+         url.pathname.startsWith('/raccolta') ||
+         url.pathname.startsWith('/lavoro-soci') ||
+         url.pathname.startsWith('/contabilita') ||
+         url.pathname.startsWith('/liquidazioni-soci') ||
+         url.pathname.startsWith('/documenti') ||
+         url.pathname.startsWith('/utenti') ||
+         url.pathname === '/' ||
+         url.pathname === '/login'
+}
+
+// Cache-First per asset statici
+async function staticStrategy(request) {
+  const cached = await caches.match(request)
+  if (cached) return cached
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      const cache = await caches.open(STATIC_CACHE)
+      cache.put(request, response.clone())
+    }
+    return response
+  } catch {
+    return caches.match('/')
   }
+}
 
-  // Static pages - cache first, network update
-  if (request.method === 'GET') {
-    e.respondWith(
-      caches.match(request).then((cached) => {
-        const fetchPromise = fetch(request).then((res) => {
-          if (res.ok) {
-            const clone = res.clone()
-            caches.open(STATIC_CACHE).then((c) => c.put(request, clone))
-          }
-          return res
-        }).catch(() => cached)
-        return cached || fetchPromise
-      }).catch(() => caches.match('/dashboard')),
-    )
-    return
+// Network-First per API
+async function apiStrategy(request) {
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      const cache = await caches.open(API_CACHE)
+      cache.put(request, response.clone())
+    }
+    return response
+  } catch {
+    const cached = await caches.match(request)
+    if (cached) return cached
+    return new Response(JSON.stringify({ error: 'Sei offline. I dati verranno aggiornati quando sarai di nuovo connesso.' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
+}
 
-  e.respondWith(fetch(request).catch(() => new Response('offline', { status: 503 })))
+// Network-First per pagine
+async function navigationStrategy(request) {
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME)
+      cache.put(request, response.clone())
+    }
+    return response
+  } catch {
+    const cached = await caches.match(request)
+    if (cached) return cached
+    return caches.match('/')
+  }
+}
+
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url)
+
+  if (event.request.method !== 'GET') return
+
+  if (isStaticAsset(url)) {
+    event.respondWith(staticStrategy(event.request))
+  } else if (isApiRequest(url)) {
+    event.respondWith(apiStrategy(event.request))
+  } else if (isNavigazione(url)) {
+    event.respondWith(navigationStrategy(event.request))
+  }
 })

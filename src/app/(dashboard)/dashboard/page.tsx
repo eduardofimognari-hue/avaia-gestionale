@@ -1,65 +1,65 @@
 import { prisma } from '@/lib/db'
 import { getCurrentAziendaId } from '@/lib/azienda-context'
+import { getGiacenzeAggregate, type GiacenzaAggregata } from '@/lib/api-utils'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Euro, Package, Users, AlertTriangle, ShoppingCart, TrendingUp, TrendingDown, PackageOpen } from 'lucide-react'
+import { Euro, Package, Users, AlertTriangle, ShoppingCart, TrendingUp, TrendingDown, PackageOpen, Receipt, CalendarClock } from 'lucide-react'
 import { DashboardChart } from './dashboard-chart'
 import { formatEuro, formatDate, formatNumber } from '@/lib/utils'
 import { redirect } from 'next/navigation'
 
 async function getStats(aziendaId: number) {
-  const [prodotti, clienti, soci, debiti, venditeMese, venditeMeseScorso, totaleVendite, debitiScaduti, movimentiCarico, movimentiScarico, entrateMese, usciteMese] = await Promise.all([
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+
+  const [prodotti, clienti, soci, debiti, venditeMese, venditeMeseScorso, totaleVendite, debitiScaduti, giacenze, entrateMese, usciteMese, fattureNonPagate, rateInScadenza] = await Promise.all([
     prisma.prodotti.count({ where: { attivo: true, aziendaId } }),
     prisma.clienti.count({ where: { attivo: true, aziendaId } }),
     prisma.soci.count({ where: { attivo: true, aziendaId } }),
-    prisma.debitiAperti.findMany({ where: { stato: 'aperto', aziendaId }, select: { importo: true } }),
-    prisma.vendite.findMany({ where: { aziendaId, data: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } }, select: { importoTotale: true } }),
-    prisma.vendite.findMany({ where: { aziendaId, data: { gte: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1), lt: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } }, select: { importoTotale: true } }),
+    prisma.debitiAperti.findMany({ where: { stato: 'aperto', aziendaId }, select: { importo: true, scadenza: true, cliente: { select: { nome: true, cognome: true } } } }),
+    prisma.vendite.findMany({ where: { aziendaId, data: { gte: startOfMonth } }, select: { importoTotale: true } }),
+    prisma.vendite.findMany({ where: { aziendaId, data: { gte: startOfLastMonth, lt: startOfMonth } }, select: { importoTotale: true } }),
     prisma.vendite.aggregate({ where: { aziendaId }, _sum: { importoTotale: true } }),
     prisma.debitiAperti.findMany({
-      where: { stato: 'aperto', aziendaId, scadenza: { lt: new Date() } },
+      where: { stato: 'aperto', aziendaId, scadenza: { lt: now } },
       include: { cliente: { select: { nome: true, cognome: true } } },
       orderBy: { scadenza: 'asc' },
     }),
-    prisma.movimentiInput.groupBy({ by: ['prodottoId'], where: { aziendaId, tipo: { in: ['carico', 'reso'] } }, _sum: { quantita: true } }),
-    prisma.movimentiInput.groupBy({ by: ['prodottoId'], where: { aziendaId, tipo: { in: ['scarico', 'vendita'] } }, _sum: { quantita: true } }),
-    prisma.movimentiCassa.aggregate({ where: { aziendaId, tipo: 'entrata', data: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } }, _sum: { importo: true } }),
-    prisma.movimentiCassa.aggregate({ where: { aziendaId, tipo: 'uscita', data: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } }, _sum: { importo: true } }),
+    getGiacenzeAggregate(aziendaId),
+    prisma.movimentiCassa.aggregate({ where: { aziendaId, tipo: 'entrata', data: { gte: startOfMonth } }, _sum: { importo: true } }),
+    prisma.movimentiCassa.aggregate({ where: { aziendaId, tipo: 'uscita', data: { gte: startOfMonth } }, _sum: { importo: true } }),
+    prisma.vendite.findMany({
+      where: { aziendaId, pagata: false },
+      include: { cliente: { select: { nome: true, cognome: true } } },
+      orderBy: { dataPagamentoPrevista: 'asc' },
+    }),
+    prisma.rate.findMany({
+      where: { aziendaId, pagata: false, scadenza: { not: null } },
+      orderBy: { scadenza: 'asc' },
+      take: 10,
+    }),
   ])
+
   const mese = venditeMese.reduce((a, v) => a + Number(v.importoTotale || 0), 0)
   const scorso = venditeMeseScorso.reduce((a, v) => a + Number(v.importoTotale || 0), 0)
 
-  const caricoMap = new Map(movimentiCarico.map(m => [m.prodottoId, Number(m._sum.quantita || 0)]))
-  const scaricoMap = new Map(movimentiScarico.map(m => [m.prodottoId, Number(m._sum.quantita || 0)]))
-  const tuttiIds = Array.from(new Set([...Array.from(caricoMap.keys()), ...Array.from(scaricoMap.keys())]))
-
-  const prodottiConId = tuttiIds.length > 0
-    ? await prisma.prodotti.findMany({
-        where: { id: { in: tuttiIds }, aziendaId, tipo: 'prodotto' },
-        select: { id: true, nome: true, varietaTipologia: true },
-      })
-    : []
-
-  const prodottiScortaBassa = prodottiConId.map((prod) => {
-    const giacenza = (caricoMap.get(prod.id) || 0) - (scaricoMap.get(prod.id) || 0)
-    if (giacenza <= 0) return { nome: prod.nome, varieta: prod.varietaTipologia, giacenza: Math.max(0, giacenza) }
-    return null
-  }).filter(Boolean)
-
-  const entrateMeseTot = Number(entrateMese._sum.importo || 0)
-  const usciteMeseTot = Number(usciteMese._sum.importo || 0)
+  const prodottiScortaBassa = giacenze
+    .filter((g) => g.giacenza <= 0)
+    .map((g) => ({ nome: g.nome, varieta: g.varieta, giacenza: g.giacenza }))
 
   return {
     prodotti, clienti, soci,
     debitiTotale: debiti.reduce((a, d) => a + Number(d.importo), 0),
-    venditeMese: mese,
-    venditeMeseScorso: scorso,
+    debitiCount: debiti.length,
+    venditeMese: mese, venditeMeseScorso: scorso,
     totaleVendite: Number(totaleVendite._sum.importoTotale || 0),
     trend: scorso > 0 ? ((mese - scorso) / scorso * 100).toFixed(1) : (mese > 0 ? '100.0' : '0'),
-    debitiScaduti,
-    prodottiScortaBassa,
-    entrateMese: entrateMeseTot,
-    usciteMese: usciteMeseTot,
+    debitiScaduti, prodottiScortaBassa,
+    entrateMese: Number(entrateMese._sum.importo || 0),
+    usciteMese: Number(usciteMese._sum.importo || 0),
+    fattureNonPagate,
+    rateInScadenza,
   }
 }
 
@@ -68,6 +68,8 @@ export default async function DashboardPage() {
   if (!aziendaId) redirect('/login')
   const s = await getStats(aziendaId)
 
+  const totFattureNonPagate = s.fattureNonPagate.reduce((a, v) => a + Number(v.importoTotale || 0), 0)
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="mb-6">
@@ -75,6 +77,7 @@ export default async function DashboardPage() {
         <p className="text-sm text-gray-500">Panoramica aziendale</p>
       </div>
 
+      {/* Avvisi critici */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         {s.debitiScaduti.length > 0 && (
           <Card className="border-red-200 bg-red-50">
@@ -95,6 +98,37 @@ export default async function DashboardPage() {
           </Card>
         )}
 
+        {s.fattureNonPagate.length > 0 && (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Receipt className="w-5 h-5 text-amber-600" />
+                <h3 className="font-semibold text-amber-800 text-sm">Fatture non pagate ({s.fattureNonPagate.length})</h3>
+              </div>
+              <div className="space-y-1">
+                {s.fattureNonPagate.slice(0, 5).map((v) => (
+                  <div key={v.id} className="flex items-center justify-between text-sm">
+                    <span className="text-amber-700">{v.cliente?.nome} {v.cliente?.cognome || ''}</span>
+                    <div className="text-right">
+                      <span className="font-medium text-amber-800 block">{formatEuro(Number(v.importoTotale || 0))}</span>
+                      {v.dataPagamentoPrevista && (
+                        <span className="text-[10px] text-amber-600">Entro {formatDate(v.dataPagamentoPrevista)}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {s.fattureNonPagate.length > 5 && (
+                  <p className="text-xs text-amber-600 text-center pt-1">+{s.fattureNonPagate.length - 5} altre fatture</p>
+                )}
+              </div>
+              <div className="mt-2 pt-2 border-t border-amber-200 flex justify-between text-sm font-medium">
+                <span className="text-amber-800">Totale atteso</span>
+                <span className="text-amber-900 font-bold">{formatEuro(totFattureNonPagate)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {s.prodottiScortaBassa.length > 0 && (
           <Card className="border-amber-200 bg-amber-50">
             <CardContent className="p-4">
@@ -103,10 +137,32 @@ export default async function DashboardPage() {
                 <h3 className="font-semibold text-amber-800 text-sm">Prodotti esauriti ({s.prodottiScortaBassa.length})</h3>
               </div>
               <div className="space-y-1">
-                {s.prodottiScortaBassa.map((p: any, i: number) => (
+                {s.prodottiScortaBassa.map((p, i) => (
                   <div key={i} className="flex items-center justify-between text-sm">
                     <span className="text-amber-700">{p.nome}{p.varieta ? ` - ${p.varieta}` : ''}</span>
                     <span className="font-medium text-amber-800">{formatNumber(p.giacenza)}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {s.rateInScadenza.length > 0 && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarClock className="w-5 h-5 text-blue-600" />
+                <h3 className="font-semibold text-blue-800 text-sm">Rate in scadenza ({s.rateInScadenza.length})</h3>
+              </div>
+              <div className="space-y-1">
+                {s.rateInScadenza.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between text-sm">
+                    <span className="text-blue-700">Rata {r.nota || `#${r.id}`}</span>
+                    <div className="text-right">
+                      <span className="font-medium text-blue-800 block">{formatEuro(Number(r.importo))}</span>
+                      {r.scadenza && <span className="text-[10px] text-blue-600">{formatDate(r.scadenza)}</span>}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -166,7 +222,7 @@ export default async function DashboardPage() {
         <Stat label="Prodotti" value={s.prodotti} icon={Package} color="text-blue-600" />
         <Stat label="Clienti" value={s.clienti} icon={Users} color="text-green-600" />
         <Stat label="Soci" value={s.soci} icon={Users} color="text-purple-600" />
-        <Stat label="Debiti aperti" value={formatEuro(s.debitiTotale)} icon={AlertTriangle} color="text-red-600" />
+        <Stat label="Crediti aperti" value={`${s.debitiCount} (${formatEuro(s.debitiTotale)})`} icon={AlertTriangle} color="text-red-600" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -215,7 +271,7 @@ async function UltimeVendite({ aziendaId }: { aziendaId: number }) {
   )
 }
 
-function Stat({ icon: Icon, label, value, color }: { icon: any; label: string; value: string | number; color: string }) {
+function Stat({ icon: Icon, label, value, color }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string | number; color: string }) {
   return (
     <Card>
       <CardContent className="p-4 flex items-center gap-3">

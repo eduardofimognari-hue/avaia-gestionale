@@ -18,6 +18,8 @@ export default function AreePage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [selectedItem, setSelectedItem] = useState<Area | null>(null)
+  const [editModalOpen, setEditModalOpen] = useState(false)
   const [form, setForm] = useState({ nome: '', descrizione: '' })
 
   async function fetchData() {
@@ -45,6 +47,26 @@ export default function AreePage() {
     finally { setSaving(false) }
   }
 
+  function openEdit(a: Area) {
+    setSelectedItem(a)
+    setForm({ nome: a.nome, descrizione: a.descrizione || '' })
+    setEditModalOpen(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedItem) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/aree/${selectedItem.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      if (!res.ok) throw new Error()
+      setEditModalOpen(false)
+      setSelectedItem(null)
+      await fetchData()
+    } catch { setError('Errore durante il salvataggio') }
+    finally { setSaving(false) }
+  }
+
   return (
     <div>
       <PageHeader title="Aree di Lavoro" description="Categorie di lavoro: Agro, Api, Amministrazione, Commerciale, Mista" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Area</Button>} />
@@ -58,7 +80,7 @@ export default function AreePage() {
               </Thead>
               <Tbody>
                 {data.map((a) => (
-                  <Tr key={a.id}>
+                  <Tr key={a.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openEdit(a)}>
                     <Td className="font-medium">{a.nome}</Td>
                     <Td>{a.descrizione || '-'}</Td>
                     <Td><Badge variant={a.attivo ? 'success' : 'default'}>{a.attivo ? 'Attiva' : 'Disattiva'}</Badge></Td>
@@ -70,6 +92,18 @@ export default function AreePage() {
           </CardContent>
         </Card>
       )}
+      <Modal open={editModalOpen} onClose={() => { setEditModalOpen(false); setSelectedItem(null) }} title={`Modifica Area - ${selectedItem?.nome}`}>
+        {selectedItem && (
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div><label className="text-sm font-medium block mb-1">Nome</label><Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required /></div>
+            <div><label className="text-sm font-medium block mb-1">Descrizione</label><Input value={form.descrizione} onChange={(e) => setForm({ ...form, descrizione: e.target.value })} /></div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="secondary" onClick={() => { setEditModalOpen(false); setSelectedItem(null) }}>Annulla</Button>
+              <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Aggiorna Area'}</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nuova Area di Lavoro">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="text-sm font-medium block mb-1">Nome</label><Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required /></div>

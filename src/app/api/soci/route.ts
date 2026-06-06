@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getCurrentAziendaId } from '@/lib/azienda-context'
-import { requireRole } from '@/lib/auth'
+import { withAzienda, withValidazione, withRuoloScrittura } from '@/lib/api-utils'
 import { sociSchema } from '@/lib/validations'
-import { ZodError } from 'zod'
 
 export async function GET() {
-  try {
-    const aziendaId = await getCurrentAziendaId()
-    if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
+  return withAzienda(async (aziendaId) => {
     const soci = await prisma.soci.findMany({
       where: { attivo: true, aziendaId },
       orderBy: { nome: 'asc' },
@@ -18,21 +14,13 @@ export async function GET() {
       },
     })
     return NextResponse.json(soci)
-  } catch (error) {
-    return NextResponse.json({ error: 'Errore nel recupero dei soci' }, { status: 500 })
-  }
+  })
 }
 
 export async function POST(request: Request) {
-  try {
-    const aziendaId = await getCurrentAziendaId()
-    if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const check = await requireRole(['admin', 'editor'], aziendaId)
-    if (!check.allowed) return check.response!
-
-    const body = await request.json()
-    const parsed = sociSchema.parse(body)
-
+  return withValidazione(request, sociSchema, async (parsed, aziendaId) => {
+    const ruolo = await withRuoloScrittura(aziendaId)
+    if (!ruolo.allowed) return ruolo.response!
     const socio = await prisma.soci.create({
       data: {
         nome: parsed.nome, cognome: parsed.cognome, aziendaId,
@@ -55,12 +43,6 @@ export async function POST(request: Request) {
         ruoli: { include: { ruolo: true } },
       },
     })
-
     return NextResponse.json(socio, { status: 201 })
-  } catch (error) {
-    if (error instanceof ZodError) {
-      return NextResponse.json({ error: error.errors.map(e => e.message).join(', ') }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Errore nella creazione del socio' }, { status: 500 })
-  }
+  })
 }

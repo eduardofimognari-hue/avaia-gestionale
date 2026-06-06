@@ -1,34 +1,19 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getCurrentAziendaId } from '@/lib/azienda-context'
-import { requireRole } from '@/lib/auth'
+import { withAzienda, withValidazione, withRuoloScrittura } from '@/lib/api-utils'
 import { clientiSchema } from '@/lib/validations'
-import { ZodError } from 'zod'
 
 export async function GET() {
-  try {
-    const aziendaId = await getCurrentAziendaId()
-    if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const clienti = await prisma.clienti.findMany({
-      where: { attivo: true, aziendaId },
-      orderBy: { nome: 'asc' },
-    })
+  return withAzienda(async (aziendaId) => {
+    const clienti = await prisma.clienti.findMany({ where: { attivo: true, aziendaId }, orderBy: { nome: 'asc' } })
     return NextResponse.json(clienti)
-  } catch (error) {
-    return NextResponse.json({ error: 'Errore nel recupero dei clienti' }, { status: 500 })
-  }
+  })
 }
 
 export async function POST(request: Request) {
-  try {
-    const aziendaId = await getCurrentAziendaId()
-    if (!aziendaId) return NextResponse.json({ error: 'Nessuna azienda selezionata' }, { status: 400 })
-    const check = await requireRole(['admin', 'editor'], aziendaId)
-    if (!check.allowed) return check.response!
-
-    const body = await request.json()
-    const parsed = clientiSchema.parse(body)
-
+  return withValidazione(request, clientiSchema, async (parsed, aziendaId) => {
+    const ruolo = await withRuoloScrittura(aziendaId)
+    if (!ruolo.allowed) return ruolo.response!
     const cliente = await prisma.clienti.create({
       data: {
         nome: parsed.nome, aziendaId,
@@ -46,12 +31,6 @@ export async function POST(request: Request) {
         note: parsed.note || null,
       },
     })
-
     return NextResponse.json(cliente, { status: 201 })
-  } catch (error) {
-    if (error instanceof ZodError) {
-      return NextResponse.json({ error: error.errors.map(e => e.message).join(', ') }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Errore nella creazione del cliente' }, { status: 500 })
-  }
+  })
 }

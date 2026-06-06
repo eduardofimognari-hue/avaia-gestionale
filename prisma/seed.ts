@@ -81,10 +81,10 @@ async function main() {
   await prisma.sociRuoli.create({ data: { socioId: giovanni.id, ruoloId: ruoli['Socio Fondatore'].id } })
   await prisma.sociRuoli.create({ data: { socioId: maria.id, ruoloId: ruoli['Socio Lavoratore'].id } })
 
-  await prisma.luoghi.create({ data: { nome: 'Santa Venerina', tipo: 'fisico', aziendaId: azienda.id } })
-  await prisma.luoghi.create({ data: { nome: 'Stazzo', tipo: 'fisico', aziendaId: azienda.id } })
-  await prisma.luoghi.create({ data: { nome: 'Api', tipo: 'fisico', note: 'Apiari e arnie', aziendaId: azienda.id } })
-  await prisma.luoghi.create({     data: { nome: 'Amministrazione', tipo: 'virtuale', note: 'Spese generali aziendali', aziendaId: azienda.id } })
+  await prisma.luoghi.create({ data: { nome: 'Santa Venerina', tipologia: 'reale', categoria: 'produttivo', usoAziendale: true, aziendaId: azienda.id } })
+  await prisma.luoghi.create({ data: { nome: 'Stazzo', tipologia: 'reale', categoria: 'produttivo', usoAziendale: true, aziendaId: azienda.id } })
+  await prisma.luoghi.create({ data: { nome: 'Api', tipologia: 'reale', categoria: 'produttivo', usoAziendale: true, note: 'Apiari e arnie', aziendaId: azienda.id } })
+  await prisma.luoghi.create({ data: { nome: 'Generale', tipologia: 'virtuale', categoria: 'non_produttivo', usoAziendale: true, note: 'Spese generali aziendali', aziendaId: azienda.id } })
 
   const aree: Record<string, { id: number }> = {}
   for (const nome of ['Agro', 'Api', 'Amministrazione', 'Commerciale', 'Mista', 'Servizi']) {
@@ -106,10 +106,10 @@ async function main() {
   }
 
   const cassaKairos = await prisma.casseInterne.create({
-    data: { nome: 'Cassa Unica', saldoIniziale: 5000.00, note: 'Conto corrente aziendale principale', aziendaId: azienda.id },
+    data: { nome: 'Kairos', saldoIniziale: 0.00, note: 'Conto corrente aziendale principale (Cassa Unica)', aziendaId: azienda.id },
   })
 
-  const amminLuogo = await prisma.luoghi.findFirst({ where: { nome: 'Amministrazione', aziendaId: azienda.id } })
+  const amminLuogo = await prisma.luoghi.findFirst({ where: { nome: 'Generale', aziendaId: azienda.id } })
   const sv = await prisma.luoghi.findFirst({ where: { nome: 'Santa Venerina', aziendaId: azienda.id } })
   const st = await prisma.luoghi.findFirst({ where: { nome: 'Stazzo', aziendaId: azienda.id } })
   if (amminLuogo && sv && st) {
@@ -155,7 +155,7 @@ async function main() {
   console.log('Ruoli: Socio Amministratore, Socio Lavoratore, Resp. Legale, Socio Fondatore, Socio Finanziatore')
   console.log('Materiali api: Arnia, Telaio, Cera, Smielatore')
   console.log('Tariffe: €10/h (€12/h Amm) per socio e area')
-  console.log('Luoghi: Santa Venerina, Stazzo, Api, Amministrazione')
+  console.log('Luoghi: Santa Venerina, Stazzo, Api, Generale')
   console.log('Credenziali: admin@avaia.it / avaia-demo')
   console.log('Editor:     editor@avaia.it / editor-demo (permessi limitati)')
 }
