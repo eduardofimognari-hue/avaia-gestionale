@@ -1,0 +1,25 @@
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 2.5s
+ ○ Compiling / ...
+ ✓ Compiled / in 4.4s (477 modules)
+ GET / 307 in 4786ms
+ ○ Compiling /src/middleware ...
+ ✓ Compiled /src/middleware in 977ms (174 modules)
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 8.4s (1904 modules)
+ GET /dashboard 200 in 11326ms
+ ✓ Compiled /manifest.webmanifest in 328ms (1128 modules)
+ GET /manifest.webmanifest 200 in 501ms
+ ✓ Compiled /api/vendite/mensili in 224ms (1130 modules)
+ ✓ Compiled (1132 modules)
+ GET /api/aziende 200 in 1047ms
+ GET /api/vendite/mensili 200 in 1050ms
+ ✓ Compiled /api/aziende/set in 174ms (1134 modules)
+ GET /api/aziende 200 in 487ms
+ GET /api/vendite/mensili 200 in 832ms
+ POST /api/aziende/set 200 in 854ms
+ POST /api/aziende/set 200 in 451ms
