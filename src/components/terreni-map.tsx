@@ -24,7 +24,7 @@ interface PolygonData {
   prodottoIds?: number[]
 }
 
-interface TerreniMapProps {
+export interface TerreniMapProps {
   polygons: PolygonData[]
   initialCenter: { lat: number; lng: number }
   onMapClick?: (lat: number, lng: number) => void
@@ -33,6 +33,10 @@ interface TerreniMapProps {
   focusPolygonId?: string | null
   categoryColors?: Record<string, { fill: string; stroke: string }>
   prodottoEmojiMap?: Record<number, string>
+  // Editing mode
+  editingPolygonId?: string | null
+  editingVertices?: { lat: number; lng: number }[]
+  onVertexDragEnd?: (index: number, lat: number, lng: number) => void
 }
 
 function centroid(paths: { lat: number; lng: number }[]) {
@@ -58,6 +62,23 @@ function getEmojis(poly: PolygonData, prodottoEmojiMap: Record<number, string>):
   return catEmoji ? [catEmoji] : ['🌿']
 }
 
+function makeEmojiIcon(emojis: string[]): L.DivIcon {
+  const SIZE = 32
+  const html = emojis.length === 1
+    ? `<div style="width:${SIZE}px;height:${SIZE}px;display:flex;align-items:center;justify-content:center;font-size:18px;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.65))">${emojis[0]}</div>`
+    : `<div style="width:${SIZE}px;height:${SIZE}px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:1px;background:rgba(255,255,255,0.9);border-radius:7px;box-shadow:0 1px 4px rgba(0,0,0,0.25);font-size:11px">${emojis.slice(0, 4).map(e => `<span>${e}</span>`).join('')}</div>`
+  return L.divIcon({ html, className: '', iconSize: [SIZE, SIZE], iconAnchor: [SIZE / 2, SIZE / 2] })
+}
+
+function makeHandleIcon(): L.DivIcon {
+  return L.divIcon({
+    html: '<div style="width:12px;height:12px;background:#1d4ed8;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
+    className: '',
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  })
+}
+
 export function TerreniMap({
   polygons,
   initialCenter,
@@ -67,19 +88,26 @@ export function TerreniMap({
   focusPolygonId,
   categoryColors = DEFAULT_CATEGORY_COLORS,
   prodottoEmojiMap = {},
+  editingPolygonId,
+  editingVertices,
+  onVertexDragEnd,
 }: TerreniMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const polyLayersRef = useRef<L.Polygon[]>([])
   const markerLayersRef = useRef<L.Marker[]>([])
   const drawingPolyRef = useRef<L.Polygon | null>(null)
+  const editPolyRef = useRef<L.Polygon | null>(null)
+  const editHandlesRef = useRef<L.Marker[]>([])
   const initializedRef = useRef(false)
 
-  // Callback refs to avoid stale closures in event handlers
+  // Callback refs to avoid stale closures
   const onMapClickRef = useRef(onMapClick)
   const onPolygonSelectRef = useRef(onPolygonSelect)
+  const onVertexDragEndRef = useRef(onVertexDragEnd)
   useEffect(() => { onMapClickRef.current = onMapClick }, [onMapClick])
   useEffect(() => { onPolygonSelectRef.current = onPolygonSelect }, [onPolygonSelect])
+  useEffect(() => { onVertexDragEndRef.current = onVertexDragEnd }, [onVertexDragEnd])
 
   // Initialize map once on mount
   useEffect(() => {
@@ -91,28 +119,20 @@ export function TerreniMap({
       zoomControl: true,
     })
 
-    // Satellite layer — Esri World Imagery, completamente gratuito, no API key
     const satellite = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      {
-        attribution: '© Esri — Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, GIS User Community',
-        maxZoom: 20,
-      }
+      { attribution: '© Esri', maxZoom: 20 }
     )
-
-    // Street layer — OpenStreetMap, gratuito
     const street = L.tileLayer(
       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      }
+      { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19 }
     )
-
     satellite.addTo(map)
     L.control.layers({ '🛰️ Satellite': satellite, '🗺️ Mappa': street }, {}, { position: 'topright' }).addTo(map)
 
     map.on('click', (e: L.LeafletMouseEvent) => {
+      // Deseleziona se clicco su area vuota della mappa
+      onPolygonSelectRef.current?.(null)
       onMapClickRef.current?.(e.latlng.lat, e.latlng.lng)
     })
 
@@ -124,6 +144,8 @@ export function TerreniMap({
       polyLayersRef.current = []
       markerLayersRef.current = []
       drawingPolyRef.current = null
+      editPolyRef.current = null
+      editHandlesRef.current = []
       initializedRef.current = false
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -133,11 +155,11 @@ export function TerreniMap({
     const map = mapRef.current
     if (!map || initializedRef.current || polygons.length === 0) return
     initializedRef.current = true
-    const allLatLngs = polygons.flatMap(p => p.paths.map(pt => [pt.lat, pt.lng] as L.LatLngTuple))
-    if (allLatLngs.length > 0) map.fitBounds(allLatLngs, { padding: [40, 40] })
+    const all = polygons.flatMap(p => p.paths.map(pt => [pt.lat, pt.lng] as L.LatLngTuple))
+    if (all.length) map.fitBounds(all, { padding: [40, 40] })
   }, [polygons])
 
-  // Redraw all polygons whenever data or colors change
+  // Redraw all polygons + emoji markers
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -148,87 +170,118 @@ export function TerreniMap({
     markerLayersRef.current = []
 
     for (const poly of polygons) {
+      const isEditing = editingPolygonId === poly.id
       const color = categoryColors[poly.category || ''] || DEFAULT_COLOR
-      const isFocused = focusPolygonId === poly.id
+      const isFocused = focusPolygonId === poly.id && !isEditing
       const latlngs = poly.paths.map(p => [p.lat, p.lng] as L.LatLngTuple)
 
       const leafletPoly = L.polygon(latlngs, {
         color: isFocused ? '#1d4ed8' : color.stroke,
         weight: isFocused ? 3 : 2,
         fillColor: color.fill,
-        fillOpacity: isFocused ? 0.55 : 0.35,
+        fillOpacity: isEditing ? 0.15 : isFocused ? 0.55 : 0.35,
+        dashArray: isEditing ? '6 4' : undefined,
       }).addTo(map)
 
-      leafletPoly.on('click', (e: L.LeafletMouseEvent) => {
-        L.DomEvent.stopPropagation(e)
-        onPolygonSelectRef.current?.(poly.id || null)
-      })
+      if (!isEditing) {
+        leafletPoly.on('click', (e: L.LeafletMouseEvent) => {
+          L.DomEvent.stopPropagation(e)
+          onPolygonSelectRef.current?.(poly.id || null)
+        })
+      }
 
       polyLayersRef.current.push(leafletPoly)
 
-      // Emoji label at centroid
-      const c = centroid(poly.paths)
-      const emojis = getEmojis(poly, prodottoEmojiMap)
-      const emojiHtml = emojis.length === 1
-        ? `<span style="font-size:24px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.7))">${emojis[0]}</span>`
-        : `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;max-width:60px;background:rgba(255,255,255,0.88);border-radius:8px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.25)">${emojis.map(e => `<span style="font-size:18px;line-height:1.2">${e}</span>`).join('')}</div>`
-
-      const icon = L.divIcon({
-        html: `<div style="transform:translate(-50%,-50%);cursor:pointer;pointer-events:auto">${emojiHtml}</div>`,
-        className: '',
-        iconSize: [0, 0],
-        iconAnchor: [0, 0],
-      })
-
-      const marker = L.marker([c.lat, c.lng], { icon, interactive: true }).addTo(map)
-      marker.on('click', () => onPolygonSelectRef.current?.(poly.id || null))
-      markerLayersRef.current.push(marker)
+      // Emoji marker — solo se non in edit mode per questo poligono
+      if (!isEditing) {
+        const c = centroid(poly.paths)
+        const emojis = getEmojis(poly, prodottoEmojiMap)
+        const marker = L.marker([c.lat, c.lng], {
+          icon: makeEmojiIcon(emojis),
+          interactive: true,
+          zIndexOffset: 100,
+        }).addTo(map)
+        marker.on('click', (e: L.LeafletMouseEvent) => {
+          L.DomEvent.stopPropagation(e)
+          onPolygonSelectRef.current?.(poly.id || null)
+        })
+        markerLayersRef.current.push(marker)
+      }
     }
-  }, [polygons, focusPolygonId, categoryColors, prodottoEmojiMap])
+  }, [polygons, focusPolygonId, editingPolygonId, categoryColors, prodottoEmojiMap])
 
-  // Drawing preview polygon (tratteggiato, aggiornato ad ogni nuovo vertice)
+  // Drawing preview (tratteggiato, aggiornato ad ogni vertice aggiunto)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    if (drawingPolyRef.current) { drawingPolyRef.current.remove(); drawingPolyRef.current = null }
+    if (drawingVertices && drawingVertices.length > 1) {
+      drawingPolyRef.current = L.polygon(
+        drawingVertices.map(v => [v.lat, v.lng] as L.LatLngTuple),
+        { color: '#d97706', weight: 2, dashArray: '8 5', fillColor: '#f59e0b', fillOpacity: 0.2, interactive: false }
+      ).addTo(map)
+    }
+  }, [drawingVertices])
+
+  // Editing mode: poligono live + handle trascinabili per i vertici
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
-    if (drawingPolyRef.current) {
-      drawingPolyRef.current.remove()
-      drawingPolyRef.current = null
-    }
+    // Pulizia precedente
+    if (editPolyRef.current) { editPolyRef.current.remove(); editPolyRef.current = null }
+    editHandlesRef.current.forEach(h => h.remove())
+    editHandlesRef.current = []
 
-    if (drawingVertices && drawingVertices.length > 1) {
-      const latlngs = drawingVertices.map(v => [v.lat, v.lng] as L.LatLngTuple)
-      drawingPolyRef.current = L.polygon(latlngs, {
-        color: '#d97706',
-        weight: 2,
-        dashArray: '8 5',
-        fillColor: '#f59e0b',
-        fillOpacity: 0.2,
-        interactive: false,
+    if (!editingVertices?.length) return
+
+    // Poligono di anteprima live
+    const latlngs = editingVertices.map(v => [v.lat, v.lng] as L.LatLngTuple)
+    const editPoly = L.polygon(latlngs, {
+      color: '#1d4ed8', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.25, interactive: false,
+    }).addTo(map)
+    editPolyRef.current = editPoly
+
+    // Handle trascinabile per ogni vertice
+    editingVertices.forEach((v, i) => {
+      const handle = L.marker([v.lat, v.lng], {
+        draggable: true,
+        icon: makeHandleIcon(),
+        zIndexOffset: 500,
       }).addTo(map)
-    }
-  }, [drawingVertices])
 
-  // Focus (zoom to) a specific polygon
+      handle.on('drag', () => {
+        // Aggiorna il poligono live senza passare da React state (smooth)
+        const allLatLngs = editHandlesRef.current.map(h => h.getLatLng())
+        editPolyRef.current?.setLatLngs(allLatLngs)
+      })
+
+      handle.on('dragend', () => {
+        const latlng = handle.getLatLng()
+        onVertexDragEndRef.current?.(i, latlng.lat, latlng.lng)
+      })
+
+      editHandlesRef.current.push(handle)
+    })
+  }, [editingVertices])
+
+  // Focus (zoom to) un poligono specifico
   useEffect(() => {
     const map = mapRef.current
     if (!map || !focusPolygonId) return
     const poly = polygons.find(p => p.id === focusPolygonId)
     if (!poly?.paths?.length) return
-    const latlngs = poly.paths.map(p => [p.lat, p.lng] as L.LatLngTuple)
-    map.fitBounds(latlngs, { padding: [60, 60] })
+    map.fitBounds(poly.paths.map(p => [p.lat, p.lng] as L.LatLngTuple), { padding: [60, 60] })
   }, [focusPolygonId, polygons])
 
   const isDrawing = drawingVertices !== undefined
+  const isEditingMap = !!editingVertices?.length
 
   return (
     <div
       ref={containerRef}
       className="w-full h-[480px] rounded-xl"
-      style={{
-        zIndex: 0,
-        cursor: isDrawing ? 'crosshair' : 'grab',
-      }}
+      style={{ zIndex: 0, cursor: isDrawing ? 'crosshair' : isEditingMap ? 'default' : 'grab' }}
     />
   )
 }

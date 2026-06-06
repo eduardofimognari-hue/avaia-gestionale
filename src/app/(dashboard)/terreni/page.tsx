@@ -135,6 +135,10 @@ export default function TerreniPage() {
   const [focusPolygonId, setFocusPolygonId] = useState<string | null>(null)
   const [categoryColors, setCategoryColors] = useState<Record<string, { fill: string; stroke: string }>>(loadCategoryColors)
 
+  // Stato per la modifica della forma di un poligono esistente
+  const [editingShapeTerreno, setEditingShapeTerreno] = useState<Terreno | null>(null)
+  const [editingPaths, setEditingPaths] = useState<{ lat: number; lng: number }[]>([])
+
   const [form, setForm] = useState({
     nome: '', superficie: '', unitaMisura: 'ha',
     indirizzo: '', comune: '', provincia: '', cap: '',
@@ -276,13 +280,60 @@ export default function TerreniPage() {
   }
 
   function handlePolygonSelect(polyId: string | null) {
-    if (!polyId) return
+    // Se in editing shape, ignora selezioni esterne
+    if (editingShapeTerreno) return
+    if (!polyId) {
+      setSummaryItem(null)
+      setFocusPolygonId(null)
+      return
+    }
     const id = parseInt(polyId.replace('terreno-', ''))
     const t = data.find(d => d.id === id)
     if (t) {
       setSummaryItem(t)
       setFocusPolygonId(polyId)
     }
+  }
+
+  function startEditShape(t: Terreno) {
+    if (!t.confine?.paths?.length) return
+    setEditingShapeTerreno(t)
+    setEditingPaths([...t.confine.paths])
+    setFocusPolygonId(`terreno-${t.id}`)
+    setSummaryItem(null)
+  }
+
+  function handleVertexDragEnd(index: number, lat: number, lng: number) {
+    setEditingPaths(prev => {
+      const next = [...prev]
+      next[index] = { lat, lng }
+      return next
+    })
+  }
+
+  async function saveEditShape() {
+    if (!editingShapeTerreno || editingPaths.length < 3) return
+    setSaving(true)
+    try {
+      const mq = computePolygonAreaMq(editingPaths)
+      const ha = Math.round(mq / 10000 * 100) / 100
+      const res = await fetch(`/api/terreni/${editingShapeTerreno.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confine: { paths: editingPaths }, superficie: ha }),
+      })
+      if (!res.ok) throw new Error()
+      setEditingShapeTerreno(null)
+      setEditingPaths([])
+      setFocusPolygonId(null)
+      await fetchData()
+    } catch { setError('Errore salvataggio forma') }
+    finally { setSaving(false) }
+  }
+
+  function cancelEditShape() {
+    setEditingShapeTerreno(null)
+    setEditingPaths([])
   }
 
   function toggleCategory(cat: string) {
@@ -425,7 +476,7 @@ export default function TerreniPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2"><Globe className="w-5 h-5 text-lime-600" /><h3 className="font-semibold">Mappa</h3></div>
                 <div className="flex gap-2">
-                  {!drawingMode && !drawnPolygon && (
+                  {!drawingMode && !drawnPolygon && !editingShapeTerreno && (
                     <Button size="sm" onClick={startDrawing}><Pencil className="w-4 h-4 mr-1" />Disegna area</Button>
                   )}
                   {drawingMode && (
@@ -441,6 +492,15 @@ export default function TerreniPage() {
                       <Trash2 className="w-4 h-4 mr-1" />Rimuovi
                     </Button>
                   )}
+                  {editingShapeTerreno && (
+                    <>
+                      <span className="text-sm text-blue-700 font-medium self-center">Modifica forma: <strong>{editingShapeTerreno.nome}</strong></span>
+                      <Button size="sm" variant="secondary" onClick={cancelEditShape}>Annulla</Button>
+                      <Button size="sm" onClick={saveEditShape} disabled={saving}>
+                        {saving ? 'Salvataggio...' : 'Salva forma'}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -454,10 +514,14 @@ export default function TerreniPage() {
                 focusPolygonId={focusPolygonId}
                 categoryColors={categoryColors}
                 prodottoEmojiMap={prodottoEmojiMap}
+                editingPolygonId={editingShapeTerreno ? `terreno-${editingShapeTerreno.id}` : null}
+                editingVertices={editingShapeTerreno ? editingPaths : undefined}
+                onVertexDragEnd={handleVertexDragEnd}
               />
               {drawingMode && <p className="text-xs text-amber-600 p-3">Clicca sulla mappa per aggiungere punti. Minimo 3 punti per completare.</p>}
               {drawnPolygon && <p className="text-xs text-green-600 p-3">Area pronta. Salvala dal pannello qui sotto.</p>}
-              {!drawingMode && !drawnPolygon && <p className="text-xs text-gray-400 p-3">Clicca "Disegna area" per tracciare. Clicca su un poligono per modificarlo.</p>}
+              {editingShapeTerreno && <p className="text-xs text-blue-600 p-3">Trascina i punti blu per modificare la forma. Poi clicca "Salva forma".</p>}
+              {!drawingMode && !drawnPolygon && !editingShapeTerreno && <p className="text-xs text-gray-400 p-3">Clicca "Disegna area" per tracciare. Clicca su un poligono per selezionarlo, poi "Modifica forma" per rimodellarlo.</p>}
             </CardContent>
           </Card>
         </div>
@@ -517,14 +581,19 @@ export default function TerreniPage() {
                 <MapPin className="w-4 h-4 text-lime-600" />
                 {summaryItem.nome}
               </h3>
-              <div className="flex gap-2 shrink-0">
+              <div className="flex gap-2 shrink-0 flex-wrap">
                 {summaryItem.confine?.paths?.length && (
-                  <Button size="sm" variant="outline" onClick={() => setFocusPolygonId(`terreno-${summaryItem.id}`)}>
-                    <Map className="w-4 h-4 mr-1" />Centra mappa
-                  </Button>
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => setFocusPolygonId(`terreno-${summaryItem.id}`)}>
+                      <Map className="w-4 h-4 mr-1" />Centra
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => startEditShape(summaryItem)}>
+                      <Pencil className="w-4 h-4 mr-1" />Modifica forma
+                    </Button>
+                  </>
                 )}
                 <Button size="sm" onClick={() => { openEdit(summaryItem); setSummaryItem(null) }}>
-                  <Pencil className="w-4 h-4 mr-1" />Modifica
+                  <Pencil className="w-4 h-4 mr-1" />Dati
                 </Button>
                 <Button size="sm" variant="danger" onClick={() => handleDeleteArea(summaryItem)}>
                   <Trash2 className="w-4 h-4 mr-1" />Elimina
