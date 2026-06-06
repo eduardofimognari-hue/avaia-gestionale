@@ -116,7 +116,6 @@ export function TerreniMap({
     const map = L.map(containerRef.current, {
       center: [initialCenter.lat, initialCenter.lng],
       zoom: 14,
-      maxZoom: 18,
       zoomControl: true,
     })
 
@@ -128,8 +127,8 @@ export function TerreniMap({
       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19 }
     )
-    satellite.addTo(map)
-    L.control.layers({ '🛰️ Satellite': satellite, '🗺️ Mappa': street }, {}, { position: 'topright' }).addTo(map)
+    street.addTo(map)
+    L.control.layers({ '🗺️ Mappa': street, '🛰️ Satellite': satellite }, {}, { position: 'topright' }).addTo(map)
 
     map.on('click', (e: L.LeafletMouseEvent) => {
       // Deseleziona se clicco su area vuota della mappa
