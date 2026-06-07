@@ -25,6 +25,8 @@ export async function POST(request: Request) {
       data: {
         data: new Date(parsed.data), prodottoId: parsed.prodottoId, tipo: parsed.tipo,
         quantita: parsed.quantita, unitaMisura: parsed.unitaMisura, aziendaId,
+        luogoId: parsed.luogoId ?? null,
+        terrenoId: parsed.terrenoId ?? null,
         note: parsed.note ?? null,
       },
       include: { prodotto: true },

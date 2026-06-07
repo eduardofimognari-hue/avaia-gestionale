@@ -24,7 +24,6 @@ export async function POST(request: Request) {
         tipologia: parsed.tipologia || 'reale',
         categoria: parsed.categoria || 'produttivo',
         usoAziendale: parsed.usoAziendale ?? true,
-        terrenoId: parsed.terrenoId ?? null,
         note: parsed.note || null,
       },
     })

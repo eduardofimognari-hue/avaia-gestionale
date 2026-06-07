@@ -121,7 +121,6 @@ model Aree {
   lavori      LavoroSoci[]
   tariffe     TariffeLavoro[]
   responsabili SociAreeResponsabilita[]
-  raccolte    Raccolta[]
   @@unique([nome, aziendaId])
   @@index([aziendaId])
 }
@@ -136,8 +135,6 @@ model Luoghi {
   tipologia   String                @default("reale")
   categoria   String                @default("produttivo")
   usoAziendale Boolean              @default(true)
-  terrenoId   Int?
-  terreno     Terreni?              @relation(fields: [terrenoId], references: [id], onDelete: SetNull)
   note        String?
   attivo      Boolean               @default(true)
   creatoIl    DateTime              @default(now())
@@ -150,6 +147,8 @@ model Luoghi {
   raccolte    Raccolta[]
   vendite     Vendite[]
   apiario     Apiario[]
+  terreni     Terreni[]
+  movimentiInput MovimentiInput[]
   @@index([aziendaId])
 }
 
@@ -172,9 +171,14 @@ model Terreni {
   aziendaId     Int
   azienda       Azienda   @relation(fields: [aziendaId], references: [id])
   creatoIl      DateTime  @default(now())
-  luoghi        Luoghi[]
+  luogoId       Int?
+  luogo         Luoghi?   @relation(fields: [luogoId], references: [id], onDelete: SetNull)
+  raccolte      Raccolta[]
+  movimenti     MovimentiInput[]
+  vendite       Vendite[]
   @@unique([nome, aziendaId])
   @@index([aziendaId])
+  @@index([aziendaId, luogoId])
 }
 
 model Apiario {
@@ -328,8 +332,8 @@ model Raccolta {
   unitaMisura String   @default("kg")
   luogoId     Int?
   luogo       Luoghi?  @relation(fields: [luogoId], references: [id])
-  areaId      Int?
-  area        Aree?    @relation(fields: [areaId], references: [id])
+  terrenoId   Int?
+  terreno     Terreni? @relation(fields: [terrenoId], references: [id])
   socioId     Int?
   socio       Soci?    @relation(fields: [socioId], references: [id])
   note        String?
@@ -350,6 +354,10 @@ model MovimentiInput {
   quantita        Float
   unitaMisura     String
   note            String?
+  luogoId         Int?
+  luogo           Luoghi?  @relation(fields: [luogoId], references: [id])
+  terrenoId       Int?
+  terreno         Terreni? @relation(fields: [terrenoId], references: [id])
   creatoIl        DateTime @default(now())
   aziendaId       Int
   azienda         Azienda  @relation(fields: [aziendaId], references: [id])
@@ -551,6 +559,8 @@ model Vendite {
   nota        String?
   luogoId     Int?
   luogo       Luoghi?  @relation(fields: [luogoId], references: [id])
+  terrenoId   Int?
+  terreno     Terreni? @relation(fields: [terrenoId], references: [id])
   statoFattura String  @default("non_fatturato")
   metodoPagamento String?
   rateizzato  Boolean  @default(false)

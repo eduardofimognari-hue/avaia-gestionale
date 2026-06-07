@@ -16,6 +16,7 @@ const terrenoSchema = z.object({
   googleMapsUrl: z.string().optional().nullable(),
   confine: z.any().optional().nullable(),
   prodottiIds: z.any().optional().nullable(),
+  luogoId: z.number().optional().nullable(),
   note: z.string().optional().nullable(),
 })
 
@@ -23,6 +24,7 @@ export async function GET() {
   return withAzienda(async (aziendaId) => {
     const terreni = await prisma.terreni.findMany({
       where: { aziendaId, attivo: true },
+      include: { luogo: { select: { id: true, nome: true } } },
       orderBy: { nome: 'asc' },
     })
     return NextResponse.json(terreni)

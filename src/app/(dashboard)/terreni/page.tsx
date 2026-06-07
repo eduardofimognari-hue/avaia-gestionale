@@ -31,11 +31,13 @@ type Terreno = {
   longitudine: number | null
   confine: { paths: PolygonPath[] } | null
   prodottiIds: number[] | null
+  luogoId: number | null
+  luogo: { id: number; nome: string } | null
   note: string | null
 }
 
 type Prodotto = { id: number; nome: string; categoria: string | null }
-type Luogo = { id: number; nome: string; tipologia: string; categoria: string; terrenoId: number | null }
+type Luogo = { id: number; nome: string; tipologia: string; categoria: string }
 
 const CATEGORY_LABELS: Record<string, string> = {
   api: 'Api', frutta: 'Frutta', ortaggi: 'Ortaggi', olio: 'Olio', trasformato: 'Trasformato', altro: 'Altro',
@@ -142,7 +144,7 @@ export default function TerreniPage() {
   const [form, setForm] = useState({
     nome: '', superficie: '', unitaMisura: 'ha',
     indirizzo: '', comune: '', provincia: '', cap: '',
-    latitudine: '', longitudine: '', note: '',
+    latitudine: '', longitudine: '', luogoId: '', note: '',
   })
 
   const fetchData = useCallback(async () => {
@@ -352,32 +354,34 @@ export default function TerreniPage() {
     if (!drawnPolygon) return
     setSaving(true)
     try {
-      const nome = areaNome || (createNewLuogo ? newLuogoNome : (luoghi.find(l => l.id === parseInt(selectedLuogoId))?.nome || 'Area'))
       const mq = computePolygonAreaMq(drawnPolygon)
       const ha = Math.round(mq / 10000 * 100) / 100
+      let luogoIdFinal: number | null = null
+
+      if (createNewLuogo && newLuogoNome) {
+        const resLuogo = await fetch('/api/luoghi', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome: newLuogoNome, tipologia: 'reale', categoria: 'produttivo', usoAziendale: true }),
+        })
+        if (!resLuogo.ok) throw new Error('Errore creazione fondo')
+        const nuovoLuogo = await resLuogo.json()
+        luogoIdFinal = nuovoLuogo.id
+      } else if (selectedLuogoId) {
+        luogoIdFinal = parseInt(selectedLuogoId)
+      }
+
       const resTerreno = await fetch('/api/terreni', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nome,
+          nome: areaNome,
           confine: { paths: drawnPolygon },
           prodottiIds: selectedProdottoIds.length > 0 ? selectedProdottoIds : null,
           superficie: ha,
           unitaMisura: 'ha',
+          luogoId: luogoIdFinal,
         }),
       })
-      if (!resTerreno.ok) throw new Error('Errore creazione area')
-      const terreno = await resTerreno.json()
-      if (createNewLuogo && newLuogoNome) {
-        await fetch('/api/luoghi', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nome: newLuogoNome, tipologia: 'reale', categoria: 'produttivo', usoAziendale: true, terrenoId: terreno.id }),
-        })
-      } else if (selectedLuogoId) {
-        await fetch(`/api/luoghi/${selectedLuogoId}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ terrenoId: terreno.id }),
-        })
-      }
+      if (!resTerreno.ok) throw new Error('Errore creazione stacco')
       setAssignModalOpen(false)
       setDrawnPolygon(null)
       await fetchData()
@@ -399,6 +403,7 @@ export default function TerreniPage() {
       cap: t.cap || '',
       latitudine: t.latitudine?.toString() || '',
       longitudine: t.longitudine?.toString() || '',
+      luogoId: t.luogoId?.toString() || '',
       note: t.note || '',
     })
     setEditProdottiIds(t.prodottiIds || [])
@@ -420,6 +425,7 @@ export default function TerreniPage() {
         cap: form.cap || null,
         latitudine: form.latitudine ? parseFloat(form.latitudine) : null,
         longitudine: form.longitudine ? parseFloat(form.longitudine) : null,
+        luogoId: form.luogoId ? parseInt(form.luogoId) : null,
         note: form.note || null,
         prodottiIds: editProdottiIds.length > 0 ? editProdottiIds : null,
       }
@@ -434,7 +440,7 @@ export default function TerreniPage() {
   }
 
   async function handleDeleteArea(t: Terreno) {
-    if (!confirm(`Eliminare definitivamente l'area "${t.nome}"?`)) return
+    if (!confirm(`Eliminare definitivamente lo stacco "${t.nome}"?`)) return
     try {
       const res = await fetch(`/api/terreni/${t.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error()
@@ -443,7 +449,7 @@ export default function TerreniPage() {
     } catch { setError('Errore durante l\'eliminazione') }
   }
 
-  function getLuoghiPerTerreno(terrenoId: number) { return luoghi.filter(l => l.terrenoId === terrenoId) }
+  function getLuogoPerTerreno(t: Terreno) { return t.luogo }
   function getProdottiPerIds(ids: number[] | null | undefined) {
     if (!ids?.length) return []
     return prodotti.filter(p => ids.includes(p.id))
@@ -464,7 +470,7 @@ export default function TerreniPage() {
 
   return (
     <div>
-      <PageHeader title="Aree di Produzione" description="Disegna le aree sulla mappa e abbinale ai prodotti e luoghi" />
+      <PageHeader title="Stacchi Produttivi" description="Disegna gli stacchi sulla mappa e abbinali ai prodotti e al fondo di appartenenza" />
 
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
@@ -629,12 +635,12 @@ export default function TerreniPage() {
                 </div>
               </div>
               <div>
-                <span className="text-gray-500 block text-xs">Luoghi collegati</span>
-                <div className="flex flex-wrap gap-1 mt-0.5">
-                  {getLuoghiPerTerreno(summaryItem.id).length > 0
-                    ? getLuoghiPerTerreno(summaryItem.id).map(l => <Badge key={l.id} variant="default" className="text-xs">{l.nome}</Badge>)
-                    : <span className="font-medium">-</span>}
-                </div>
+                <span className="text-gray-500 block text-xs">Fondo (luogo)</span>
+                <span className="font-medium">
+                  {getLuogoPerTerreno(summaryItem)
+                    ? <Badge variant="default" className="text-xs">{getLuogoPerTerreno(summaryItem)!.nome}</Badge>
+                    : '-'}
+                </span>
               </div>
               {summaryItem.note && (
                 <div className="col-span-2">
@@ -656,7 +662,6 @@ export default function TerreniPage() {
               <Tbody>
                 {data.map((t) => {
                   const prods = getProdottiPerIds(t.prodottiIds)
-                  const luoghiCollegati = getLuoghiPerTerreno(t.id)
                   const isActive = summaryItem?.id === t.id
                   return (
                     <Tr key={t.id} className={`cursor-pointer hover:bg-gray-50 ${isActive ? 'bg-lime-50' : ''}`} onClick={() => handleRowClick(t)}>
@@ -668,7 +673,7 @@ export default function TerreniPage() {
                           </div>
                         ) : <span className="text-gray-400">-</span>}
                       </Td>
-                      <Td>{luoghiCollegati.length > 0 ? luoghiCollegati.map(l => l.nome).join(', ') : <span className="text-gray-400">-</span>}</Td>
+                      <Td>{t.luogo ? t.luogo.nome : <span className="text-gray-400">-</span>}</Td>
                       <Td>{t.superficie != null ? `${t.superficie} ${t.unitaMisura}` : '-'}</Td>
                       <Td>
                         {t.confine?.paths?.length ? (
@@ -681,7 +686,7 @@ export default function TerreniPage() {
                     </Tr>
                   )
                 })}
-                {data.length === 0 && <Tr><Td colSpan={5} className="text-center text-gray-500 py-8">Nessuna area di produzione</Td></Tr>}
+                {data.length === 0 && <Tr><Td colSpan={5} className="text-center text-gray-500 py-8">Nessuno stacco produttivo</Td></Tr>}
               </Tbody>
             </Table>
           </CardContent>
@@ -689,10 +694,10 @@ export default function TerreniPage() {
       )}
 
       {/* Modal assegnazione area */}
-      <Modal open={assignModalOpen} onClose={() => { setAssignModalOpen(false); setDrawnPolygon(null) }} title="Nuova area di produzione" className="sm:max-w-lg">
+      <Modal open={assignModalOpen} onClose={() => { setAssignModalOpen(false); setDrawnPolygon(null) }} title="Nuovo stacco produttivo" className="sm:max-w-lg">
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium block mb-1">Nome area *</label>
+            <label className="text-sm font-medium block mb-1">Nome stacco *</label>
             <Input value={areaNome} onChange={e => setAreaNome(e.target.value)} placeholder="Es. Campo Nord, Vigneto Sud..." required />
             <p className="text-xs text-gray-400 mt-1">
               <Ruler className="w-3 h-3 inline mr-1" />
@@ -731,7 +736,7 @@ export default function TerreniPage() {
               <Select value={selectedLuogoId} onChange={e => setSelectedLuogoId(e.target.value)} required>
                 <option value="">-- Seleziona un luogo --</option>
                 {luoghiRealiProduttivi.map(l => (
-                  <option key={l.id} value={l.id}>{l.nome}{l.terrenoId ? ' (già assegnato)' : ''}</option>
+                  <option key={l.id} value={l.id}>{l.nome}</option>
                 ))}
               </Select>
             )}
@@ -749,7 +754,7 @@ export default function TerreniPage() {
 
       {/* Modal modifica */}
       <Modal open={editModalOpen} onClose={() => { setEditModalOpen(false); setSelectedItem(null) }}
-        title={selectedItem ? `Modifica - ${selectedItem.nome}` : 'Nuova area'} className="sm:max-w-lg">
+        title={selectedItem ? `Modifica - ${selectedItem.nome}` : 'Nuovo stacco'} className="sm:max-w-lg">
         <form onSubmit={handleEditSubmit} className="space-y-4">
           <div><label className="text-sm font-medium block mb-1">Nome *</label><Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} required /></div>
           <div><label className="text-sm font-medium block mb-2">Prodotti associati</label>
@@ -779,14 +784,14 @@ export default function TerreniPage() {
             <div><label className="text-sm font-medium block mb-1">CAP</label><Input value={form.cap} onChange={e => setForm({ ...form, cap: e.target.value })} /></div>
           </div>
           <div><label className="text-sm font-medium block mb-1">Note</label><Input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
-          {selectedItem && (
-            <div className="bg-gray-50 rounded-lg p-3">
-              <label className="text-sm font-medium block mb-2">Luoghi collegati ({getLuoghiPerTerreno(selectedItem.id).length})</label>
-              {getLuoghiPerTerreno(selectedItem.id).length > 0
-                ? <div className="flex flex-wrap gap-1">{getLuoghiPerTerreno(selectedItem.id).map(l => <Badge key={l.id} variant="default">{l.nome}</Badge>)}</div>
-                : <p className="text-xs text-gray-400">Nessun luogo.</p>}
-            </div>
-          )}
+          <div>
+            <label className="text-sm font-medium block mb-1">Fondo di appartenenza</label>
+            <Select value={form.luogoId} onChange={e => setForm({ ...form, luogoId: e.target.value })}>
+              <option value="">Nessuno</option>
+              {luoghiRealiProduttivi.map(l => <option key={l.id} value={l.id}>{l.nome}</option>)}
+            </Select>
+            {luoghiRealiProduttivi.length === 0 && <p className="text-xs text-amber-600 mt-1">Nessun luogo reale/produttivo. Creane uno in Anagrafiche → Luoghi.</p>}
+          </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => { setEditModalOpen(false); setSelectedItem(null) }}>Annulla</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Aggiorna'}</Button>

@@ -26,6 +26,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         googleMapsUrl: body.googleMapsUrl !== undefined ? body.googleMapsUrl : undefined,
         confine: body.confine !== undefined ? body.confine : undefined,
         prodottiIds: body.prodottiIds !== undefined ? body.prodottiIds : undefined,
+        luogoId: body.luogoId !== undefined ? (body.luogoId ?? null) : undefined,
         note: body.note !== undefined ? body.note : undefined,
         attivo: body.attivo !== undefined ? body.attivo : undefined,
       },

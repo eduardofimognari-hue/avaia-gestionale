@@ -35,18 +35,24 @@ export default function MagazzinoPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<'movimenti' | 'giacenze'>('giacenze')
-  const [form, setForm] = useState({ data: '', prodottoId: '', tipo: 'carico', quantita: '', unitaMisura: 'kg', note: '' })
+  const [luoghi, setLuoghi] = useState<{ id: number; nome: string }[]>([])
+  const [terreni, setTerreni] = useState<{ id: number; nome: string; luogoId: number | null }[]>([])
+  const [form, setForm] = useState({ data: '', prodottoId: '', tipo: 'carico', quantita: '', unitaMisura: 'kg', luogoId: '', terrenoId: '', note: '' })
 
   async function fetchData() {
     try {
       setLoading(true)
-      const [resMov, resProd] = await Promise.all([
+      const [resMov, resProd, resLuoghi, resTerreni] = await Promise.all([
         fetch('/api/magazzino'),
-        fetch('/api/prodotti')
+        fetch('/api/prodotti'),
+        fetch('/api/luoghi'),
+        fetch('/api/terreni'),
       ])
       if (!resMov.ok || !resProd.ok) throw new Error()
       setMovimenti(await resMov.json())
       setProdotti(await resProd.json())
+      if (resLuoghi.ok) setLuoghi(await resLuoghi.json())
+      if (resTerreni.ok) setTerreni(await resTerreni.json())
     } catch { setError('Errore caricamento dati') }
     finally { setLoading(false) }
   }
@@ -74,12 +80,14 @@ export default function MagazzinoPage() {
         tipo: form.tipo,
         quantita: parseFloat(form.quantita),
         unitaMisura: form.unitaMisura,
+        luogoId: form.luogoId ? parseInt(form.luogoId) : null,
+        terrenoId: form.terrenoId ? parseInt(form.terrenoId) : null,
         note: form.note || null
       }
       const res = await fetch('/api/magazzino', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) throw new Error()
       setModalOpen(false)
-      setForm({ data: '', prodottoId: '', tipo: 'carico', quantita: '', unitaMisura: 'kg', note: '' })
+      setForm({ data: '', prodottoId: '', tipo: 'carico', quantita: '', unitaMisura: 'kg', luogoId: '', terrenoId: '', note: '' })
       await fetchData()
       await fetchGiacenze()
     } catch { setError('Errore durante il salvataggio') }
@@ -181,6 +189,24 @@ export default function MagazzinoPage() {
             </div>
             <div><label className="text-sm font-medium block mb-1">Note</label><Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
           </div>
+          {form.tipo === 'carico' && (
+            <div className="grid grid-cols-2 gap-4 border-t pt-3">
+              <div>
+                <label className="text-sm font-medium block mb-1">Provenienza — Fondo</label>
+                <Select value={form.luogoId} onChange={(e) => setForm({ ...form, luogoId: e.target.value, terrenoId: '' })}>
+                  <option value="">Nessuno</option>
+                  {luoghi.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Provenienza — Stacco</label>
+                <Select value={form.terrenoId} onChange={(e) => setForm({ ...form, terrenoId: e.target.value })}>
+                  <option value="">Nessuno</option>
+                  {(form.luogoId ? terreni.filter(t => t.luogoId === parseInt(form.luogoId)) : terreni).map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                </Select>
+              </div>
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Annulla</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Salva'}</Button>

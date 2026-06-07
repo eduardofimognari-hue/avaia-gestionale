@@ -11,7 +11,7 @@ export async function GET() {
         include: {
           prodotto: { select: { id: true, nome: true, varietaTipologia: true, unitaMisura: true } },
           luogo: { select: { id: true, nome: true } },
-          area: { select: { id: true, nome: true } },
+          terreno: { select: { id: true, nome: true } },
           socio: { select: { id: true, nome: true, cognome: true } },
         },
         orderBy: { data: 'desc' },
@@ -44,13 +44,13 @@ export async function POST(request: Request) {
         data: {
           data: new Date(parsed.data), prodottoId: parsed.prodottoId, aziendaId,
           quantita: parsed.quantita, unitaMisura: parsed.unitaMisura ?? 'kg',
-          luogoId: parsed.luogoId ?? null, areaId: parsed.areaId ?? null,
+          luogoId: parsed.luogoId ?? null, terrenoId: parsed.terrenoId ?? null,
           socioId: parsed.socioId ?? null, note: parsed.note ?? null,
         },
         include: {
           prodotto: { select: { id: true, nome: true, varietaTipologia: true } },
           luogo: { select: { id: true, nome: true } },
-          area: { select: { id: true, nome: true } },
+          terreno: { select: { id: true, nome: true } },
           socio: { select: { id: true, nome: true, cognome: true } },
         },
       })

@@ -106,7 +106,7 @@ export function SociClient({ initialData, aree, ruoliList }: Props) {
           ))}
         </div>
       </div>
-      <div><label className="text-sm font-medium block mb-1">Responsabilità (aree di lavoro)</label>
+      <div><label className="text-sm font-medium block mb-1">Responsabilità (categorie di lavoro)</label>
         <div className="flex flex-wrap gap-3 mt-1">
           {aree.map(a => (
             <label key={a.id} className="flex items-center gap-1.5 text-sm cursor-pointer">

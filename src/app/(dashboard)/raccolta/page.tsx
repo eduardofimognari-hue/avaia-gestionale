@@ -19,14 +19,14 @@ type Raccolta = {
   quantita: number
   unitaMisura: string
   luogo: { id: number; nome: string } | null
-  area: { id: number; nome: string } | null
+  terreno: { id: number; nome: string } | null
   socio: { id: number; nome: string; cognome: string } | null
   note: string | null
 }
 
 type Prodotto = { id: number; nome: string; varietaTipologia: string | null; unitaMisura: string }
 type Luogo = { id: number; nome: string }
-type Area = { id: number; nome: string }
+type Terreno = { id: number; nome: string; luogoId: number | null; luogo: { id: number; nome: string } | null }
 type Socio = { id: number; nome: string; cognome: string }
 
 export default function RaccoltaPage() {
@@ -35,7 +35,7 @@ export default function RaccoltaPage() {
   const [totali, setTotali] = useState<{ prodottoId: number; _sum: { quantita: number | null } }[]>([])
   const [prodottiList, setProdottiList] = useState<Prodotto[]>([])
   const [luoghi, setLuoghi] = useState<Luogo[]>([])
-  const [aree, setAree] = useState<Area[]>([])
+  const [terreni, setTerreni] = useState<Terreno[]>([])
   const [soci, setSoci] = useState<Socio[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -43,33 +43,45 @@ export default function RaccoltaPage() {
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     data: '', prodottoId: '', quantita: '', unitaMisura: 'kg',
-    luogoId: '', areaId: '', socioId: '', note: '',
+    luogoId: '', terrenoId: '', socioId: '', note: '',
   })
+
+  // Stacchi filtrati per il luogo selezionato
+  const stacchiFiltrati = form.luogoId
+    ? terreni.filter(t => t.luogoId === parseInt(form.luogoId))
+    : terreni
 
   async function fetchData() {
     try {
       setLoading(true)
-      const [resRaccolta, resProdotti, resLuoghi, resAree, resSoci] = await Promise.all([
+      const [resRaccolta, resProdotti, resLuoghi, resTerreni, resSoci] = await Promise.all([
         fetch('/api/raccolta'),
         fetch('/api/prodotti'),
         fetch('/api/luoghi'),
-        fetch('/api/aree'),
+        fetch('/api/terreni'),
         fetch('/api/soci'),
       ])
-      if (!resRaccolta.ok || !resProdotti.ok || !resLuoghi.ok || !resAree.ok || !resSoci.ok) throw new Error()
+      if (!resRaccolta.ok || !resProdotti.ok || !resLuoghi.ok || !resTerreni.ok || !resSoci.ok) throw new Error()
       const dataR = await resRaccolta.json()
       setRaccolte(dataR.raccolte)
       setTotali(dataR.totali)
       setProdotti(dataR.prodotti)
       setProdottiList(await resProdotti.json())
       setLuoghi(await resLuoghi.json())
-      setAree(await resAree.json())
+      setTerreni(await resTerreni.json())
       setSoci(await resSoci.json())
     } catch { setError('Errore caricamento dati') }
     finally { setLoading(false) }
   }
 
   useEffect(() => { fetchData() }, [])
+
+  // Quando cambia il luogo, azzera lo stacco se non compatibile
+  function handleLuogoChange(luogoId: string) {
+    const terrenoAttuale = terreni.find(t => t.id === parseInt(form.terrenoId))
+    const terrenoCompatibile = terrenoAttuale && terrenoAttuale.luogoId === parseInt(luogoId)
+    setForm(f => ({ ...f, luogoId, terrenoId: terrenoCompatibile ? f.terrenoId : '' }))
+  }
 
   function getProdottoInfo(prodottoId: number) {
     return prodotti.find(p => p.id === prodottoId)
@@ -85,14 +97,14 @@ export default function RaccoltaPage() {
         quantita: parseFloat(form.quantita),
         unitaMisura: form.unitaMisura,
         luogoId: form.luogoId ? parseInt(form.luogoId) : null,
-        areaId: form.areaId ? parseInt(form.areaId) : null,
+        terrenoId: form.terrenoId ? parseInt(form.terrenoId) : null,
         socioId: form.socioId ? parseInt(form.socioId) : null,
         note: form.note || null,
       }
       const res = await fetch('/api/raccolta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
       setModalOpen(false)
-      setForm({ data: '', prodottoId: '', quantita: '', unitaMisura: 'kg', luogoId: '', areaId: '', socioId: '', note: '' })
+      setForm({ data: '', prodottoId: '', quantita: '', unitaMisura: 'kg', luogoId: '', terrenoId: '', socioId: '', note: '' })
       await fetchData()
     } catch (err: any) { setError(err.message || 'Errore') }
     finally { setSaving(false) }
@@ -138,8 +150,8 @@ export default function RaccoltaPage() {
                     <Th>Data</Th>
                     <Th>Prodotto</Th>
                     <Th>Quantità</Th>
-                    <Th>Luogo</Th>
-                    <Th>Area</Th>
+                    <Th>Luogo (fondo)</Th>
+                    <Th>Stacco produttivo</Th>
                     <Th>Socio</Th>
                     <Th>Note</Th>
                   </Tr>
@@ -156,7 +168,7 @@ export default function RaccoltaPage() {
                       </Td>
                       <Td className="font-medium">{formatNumber(r.quantita)} {r.unitaMisura}</Td>
                       <Td>{r.luogo ? <><MapPin className="w-3 h-3 inline mr-1 text-gray-400" />{r.luogo.nome}</> : '-'}</Td>
-                      <Td>{r.area ? <Badge variant="default">{r.area.nome}</Badge> : '-'}</Td>
+                      <Td>{r.terreno ? <Badge variant="default">{r.terreno.nome}</Badge> : '-'}</Td>
                       <Td>{r.socio ? <><User className="w-3 h-3 inline mr-1 text-gray-400" />{r.socio.nome} {r.socio.cognome}</> : '-'}</Td>
                       <Td className="text-gray-500 text-xs">{r.note || '-'}</Td>
                     </Tr>
@@ -204,17 +216,20 @@ export default function RaccoltaPage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium block mb-1">Luogo produttivo</label>
-              <Select value={form.luogoId} onChange={e => setForm({ ...form, luogoId: e.target.value })}>
+              <label className="text-sm font-medium block mb-1">Luogo / Fondo</label>
+              <Select value={form.luogoId} onChange={e => handleLuogoChange(e.target.value)}>
                 <option value="">Seleziona...</option>
                 {luoghi.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium block mb-1">Area (opzionale)</label>
-              <Select value={form.areaId} onChange={e => setForm({ ...form, areaId: e.target.value })}>
-                <option value="">Nessuna area</option>
-                {aree.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}
+              <label className="text-sm font-medium block mb-1">
+                Stacco produttivo
+                {form.luogoId && stacchiFiltrati.length === 0 && <span className="text-xs text-amber-500 ml-1">(nessuno per questo fondo)</span>}
+              </label>
+              <Select value={form.terrenoId} onChange={e => setForm({ ...form, terrenoId: e.target.value })}>
+                <option value="">Nessuno</option>
+                {stacchiFiltrati.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
               </Select>
             </div>
           </div>

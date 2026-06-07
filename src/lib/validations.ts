@@ -53,7 +53,6 @@ export const luoghiSchema = z.object({
   tipologia: z.string().optional().default('reale'),
   categoria: z.string().optional().default('produttivo'),
   usoAziendale: z.boolean().optional().default(true),
-  terrenoId: z.number().optional().nullable(),
   note: z.string().optional().nullable(),
 })
 
@@ -75,6 +74,8 @@ export const magazzinoMovimentoSchema = z.object({
   tipo: z.enum(['carico', 'scarico', 'vendita', 'reso'], { required_error: 'Tipo non valido' }),
   quantita: z.number().positive('Quantità deve essere positiva'),
   unitaMisura: z.string().min(1, 'Unità misura obbligatoria'),
+  luogoId: z.number().optional().nullable(),
+  terrenoId: z.number().optional().nullable(),
   note: z.string().optional().nullable(),
 })
 
@@ -166,7 +167,7 @@ export const raccoltaSchema = z.object({
   quantita: z.number().positive('Quantità deve essere positiva'),
   unitaMisura: z.string().optional().default('kg'),
   luogoId: z.number().optional().nullable(),
-  areaId: z.number().optional().nullable(),
+  terrenoId: z.number().optional().nullable(),
   socioId: z.number().optional().nullable(),
   note: z.string().optional().nullable(),
 })

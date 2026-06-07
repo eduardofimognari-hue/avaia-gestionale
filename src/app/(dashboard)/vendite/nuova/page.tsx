@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react'
 interface Prodotto { id: number; nome: string; varietaTipologia: string | null; tipo: string }
 interface Cliente { id: number; nome: string; cognome: string | null; tipo: string }
 interface Luogo { id: number; nome: string }
+interface Terreno { id: number; nome: string; luogoId: number | null }
 interface Riga { prodottoId: number; prodottoNome: string; formato: string; quantita: number; prezzoUnitario: number; disponibile: number }
 
 export default function NuovaVenditaPage() {
@@ -20,10 +21,12 @@ export default function NuovaVenditaPage() {
   const [prodotti, setProdotti] = useState<Prodotto[]>([])
   const [clienti, setClienti] = useState<Cliente[]>([])
   const [luoghi, setLuoghi] = useState<Luogo[]>([])
+  const [terreni, setTerreni] = useState<Terreno[]>([])
   const [clienteId, setClienteId] = useState('')
   const [tipoCliente, setTipoCliente] = useState('Privato')
   const [data, setData] = useState(new Date().toISOString().split('T')[0])
   const [luogoId, setLuogoId] = useState('')
+  const [terrenoId, setTerrenoId] = useState('')
   const [statoFattura, setStatoFattura] = useState('non_fatturato')
   const [metodoPagamento, setMetodoPagamento] = useState('contanti')
   const [rateizzato, setRateizzato] = useState(false)
@@ -38,10 +41,12 @@ export default function NuovaVenditaPage() {
       fetch('/api/prodotti').then(r => r.json()),
       fetch('/api/clienti').then(r => r.json()),
       fetch('/api/contabilita').then(r => r.json()),
-    ]).then(([p, c, cont]) => {
+      fetch('/api/terreni').then(r => r.json()),
+    ]).then(([p, c, cont, t]) => {
       setProdotti(p.filter((x: Prodotto) => x.tipo === 'prodotto'))
       setClienti(c)
       setLuoghi(cont.luoghi || [])
+      setTerreni(Array.isArray(t) ? t : [])
     })
   }, [])
 
@@ -106,6 +111,7 @@ export default function NuovaVenditaPage() {
         clienteId: clienteId ? Number(clienteId) : null,
         tipoCliente,
         luogoId: luogoId ? Number(luogoId) : null,
+        terrenoId: terrenoId ? Number(terrenoId) : null,
         statoFattura,
         metodoPagamento: rateizzato ? 'rate' : metodoPagamento,
         rateizzato,
@@ -163,12 +169,18 @@ export default function NuovaVenditaPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Luogo di riferimento (sottocassa)</Label>
-                <Select value={luogoId} onChange={e => setLuogoId(e.target.value)}>
+                <Label>Fondo di provenienza</Label>
+                <Select value={luogoId} onChange={e => { setLuogoId(e.target.value); setTerrenoId('') }}>
                   <option value="">-- Nessuno --</option>
                   {luoghi.map(l => <option key={l.id} value={l.id}>{l.nome}</option>)}
                 </Select>
-                <p className="text-[10px] text-gray-400">Non compare in fattura, usato per la contabilità interna</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Stacco produttivo</Label>
+                <Select value={terrenoId} onChange={e => setTerrenoId(e.target.value)}>
+                  <option value="">-- Nessuno --</option>
+                  {(luogoId ? terreni.filter(t => t.luogoId === Number(luogoId)) : terreni).map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Stato fatturazione</Label>

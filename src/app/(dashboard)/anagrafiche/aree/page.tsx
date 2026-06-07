@@ -69,7 +69,7 @@ export default function AreePage() {
 
   return (
     <div>
-      <PageHeader title="Aree di Lavoro" description="Categorie di lavoro: Agro, Api, Amministrazione, Commerciale, Mista" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Area</Button>} />
+      <PageHeader title="Categorie di Lavoro" description="Categorie di lavoro: Agro, Api, Amministrazione, Commerciale, Mista" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Categoria</Button>} />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       {loading ? (<p className="text-gray-500">Caricamento...</p>) : (
         <Card>
@@ -92,7 +92,7 @@ export default function AreePage() {
           </CardContent>
         </Card>
       )}
-      <Modal open={editModalOpen} onClose={() => { setEditModalOpen(false); setSelectedItem(null) }} title={`Modifica Area - ${selectedItem?.nome}`}>
+      <Modal open={editModalOpen} onClose={() => { setEditModalOpen(false); setSelectedItem(null) }} title={`Modifica Categoria - ${selectedItem?.nome}`}>
         {selectedItem && (
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <div><label className="text-sm font-medium block mb-1">Nome</label><Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required /></div>
@@ -104,7 +104,7 @@ export default function AreePage() {
           </form>
         )}
       </Modal>
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nuova Area di Lavoro">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nuova Categoria di Lavoro">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div><label className="text-sm font-medium block mb-1">Nome</label><Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required /></div>
           <div><label className="text-sm font-medium block mb-1">Descrizione</label><Input value={form.descrizione} onChange={(e) => setForm({ ...form, descrizione: e.target.value })} /></div>
