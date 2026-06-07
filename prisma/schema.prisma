@@ -41,6 +41,8 @@ model Azienda {
   rate                  Rate[]
   apiario               Apiario[]
   attrezzature          Attrezzature[]
+  sistemiIrrigazione    SistemiIrrigazione[]
+  portaInnesti          PortaInnesti[]
 }
 
 model Ruoli {
@@ -153,32 +155,60 @@ model Luoghi {
 }
 
 model Terreni {
-  id            Int       @id @default(autoincrement())
-  nome          String
-  superficie    Float?
-  unitaMisura   String    @default("ha")
-  indirizzo     String?
-  comune        String?
-  provincia     String?
-  cap           String?
-  latitudine    Float?
-  longitudine   Float?
-  googleMapsUrl String?
-  confine       Json?
-  prodottiIds   Json?
-  note          String?
-  attivo        Boolean   @default(true)
-  aziendaId     Int
-  azienda       Azienda   @relation(fields: [aziendaId], references: [id])
-  creatoIl      DateTime  @default(now())
-  luogoId       Int?
-  luogo         Luoghi?   @relation(fields: [luogoId], references: [id], onDelete: SetNull)
-  raccolte      Raccolta[]
-  movimenti     MovimentiInput[]
-  vendite       Vendite[]
+  id                    Int       @id @default(autoincrement())
+  nome                  String
+  superficie            Float?
+  unitaMisura           String    @default("ha")
+  indirizzo             String?
+  comune                String?
+  provincia             String?
+  cap                   String?
+  latitudine            Float?
+  longitudine           Float?
+  googleMapsUrl         String?
+  confine               Json?
+  prodottiIds           Json?
+  note                  String?
+  attivo                Boolean   @default(true)
+  aziendaId             Int
+  azienda               Azienda   @relation(fields: [aziendaId], references: [id])
+  creatoIl              DateTime  @default(now())
+  luogoId               Int?
+  luogo                 Luoghi?   @relation(fields: [luogoId], references: [id], onDelete: SetNull)
+  // Campi agronomici stacco
+  numeroPiante          Int?
+  annoImpianto          Int?
+  culturaVarieta        String?
+  sistemaIrrigazioneId  Int?
+  sistemaIrrigazione    SistemiIrrigazione? @relation(fields: [sistemaIrrigazioneId], references: [id], onDelete: SetNull)
+  portaInnestoId        Int?
+  portaInnesto          PortaInnesti? @relation(fields: [portaInnestoId], references: [id], onDelete: SetNull)
+  raccolte              Raccolta[]
+  movimenti             MovimentiInput[]
+  vendite               Vendite[]
   @@unique([nome, aziendaId])
   @@index([aziendaId])
   @@index([aziendaId, luogoId])
+}
+
+model SistemiIrrigazione {
+  id        Int       @id @default(autoincrement())
+  nome      String
+  aziendaId Int
+  azienda   Azienda   @relation(fields: [aziendaId], references: [id])
+  terreni   Terreni[]
+  @@unique([nome, aziendaId])
+  @@index([aziendaId])
+}
+
+model PortaInnesti {
+  id        Int       @id @default(autoincrement())
+  nome      String
+  aziendaId Int
+  azienda   Azienda   @relation(fields: [aziendaId], references: [id])
+  terreni   Terreni[]
+  @@unique([nome, aziendaId])
+  @@index([aziendaId])
 }
 
 model Apiario {

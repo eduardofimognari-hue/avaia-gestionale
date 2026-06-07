@@ -17,6 +17,11 @@ const terrenoSchema = z.object({
   confine: z.any().optional().nullable(),
   prodottiIds: z.any().optional().nullable(),
   luogoId: z.number().optional().nullable(),
+  numeroPiante: z.number().int().optional().nullable(),
+  annoImpianto: z.number().int().optional().nullable(),
+  culturaVarieta: z.string().optional().nullable(),
+  sistemaIrrigazioneId: z.number().optional().nullable(),
+  portaInnestoId: z.number().optional().nullable(),
   note: z.string().optional().nullable(),
 })
 
@@ -24,7 +29,11 @@ export async function GET() {
   return withAzienda(async (aziendaId) => {
     const terreni = await prisma.terreni.findMany({
       where: { aziendaId, attivo: true },
-      include: { luogo: { select: { id: true, nome: true } } },
+      include: {
+        luogo: { select: { id: true, nome: true } },
+        sistemaIrrigazione: { select: { id: true, nome: true } },
+        portaInnesto: { select: { id: true, nome: true } },
+      },
       orderBy: { nome: 'asc' },
     })
     return NextResponse.json(terreni)

@@ -28,7 +28,7 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
   const [error, setError] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
   const [form, setForm] = useState({ tipo: 'ddt', venditaId: '', data: '', note: '' })
-  const [pagaFattura, setPagaFattura] = useState<{ fatturaId: number; dataPagamento: string; metodoPagamento: string } | null>(null)
+  const [saldaFattura, setSaldaFattura] = useState<{ fatturaId: number; dataPagamento: string; metodoPagamento: string } | null>(null)
 
   async function refreshDocumenti() {
     const res = await fetch('/api/documenti')
@@ -38,6 +38,7 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
   const documentiFiltrati = filtroTipo ? documenti.filter(d => d.tipo === filtroTipo) : documenti
   const ddtCount = documenti.filter(d => d.tipo === 'ddt').length
   const fatturaCount = documenti.filter(d => d.tipo === 'fattura').length
+  const fattureInAttesa = documenti.filter(d => d.tipo === 'fattura' && d.stato === 'emesso').length
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -64,19 +65,31 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
     finally { setConfermando(null) }
   }
 
-  async function handlePagaFattura(docId: number) {
-    if (!pagaFattura) return
+  async function handleSaldaFattura(docId: number) {
+    if (!saldaFattura) return
     setConfermando(docId)
     try {
       const res = await fetch(`/api/documenti/${docId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ azione: 'paga', dataPagamento: pagaFattura.dataPagamento || null, metodoPagamento: pagaFattura.metodoPagamento || 'bonifico' }),
+        body: JSON.stringify({ azione: 'paga', dataPagamento: saldaFattura.dataPagamento || null, metodoPagamento: saldaFattura.metodoPagamento || 'bonifico' }),
       })
       if (!res.ok) throw new Error()
-      setPagaFattura(null)
+      setSaldaFattura(null)
       await refreshDocumenti()
-    } catch { setError('Errore durante registrazione pagamento') }
+    } catch { setError('Errore durante registrazione saldo') }
     finally { setConfermando(null) }
+  }
+
+  function getStatoBadge(d: Documento) {
+    if (d.tipo === 'ddt') {
+      if (d.stato === 'bozza') return <Badge variant="warning">Bozza DDT</Badge>
+      if (d.stato === 'emesso') return <Badge variant="info">DDT Confermato</Badge>
+      return <Badge variant="success">Fattura Emessa</Badge>
+    }
+    // fattura
+    if (d.stato === 'bozza') return <Badge variant="warning">Bozza Fattura</Badge>
+    if (d.stato === 'emesso') return <Badge variant="info">In attesa saldo</Badge>
+    return <Badge variant="success">Saldata</Badge>
   }
 
   return (
@@ -84,10 +97,11 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
       <PageHeader title="DDT e Fatture" description="Gestione documenti di trasporto e fatture" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Genera Documento</Button>} />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <Card><CardContent className="p-4 flex items-center gap-3"><FileText className="w-8 h-8 text-blue-500" /><div><p className="text-xs text-gray-500">DDT</p><p className="text-lg font-bold">{ddtCount}</p></div></CardContent></Card>
-        <Card><CardContent className="p-4 flex items-center gap-3"><FileSpreadsheet className="w-8 h-8 text-green-500" /><div><p className="text-xs text-gray-500">Fatture</p><p className="text-lg font-bold">{fatturaCount}</p></div></CardContent></Card>
-        <Card><CardContent className="p-4 flex items-center gap-3"><FileText className="w-8 h-8 text-gray-500" /><div><p className="text-xs text-gray-500">Totale</p><p className="text-lg font-bold">{documenti.length}</p></div></CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center gap-3"><FileSpreadsheet className="w-8 h-8 text-green-500" /><div><p className="text-xs text-gray-500">Fatture totali</p><p className="text-lg font-bold">{fatturaCount}</p></div></CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center gap-3"><FileSpreadsheet className="w-8 h-8 text-amber-500" /><div><p className="text-xs text-gray-500">In attesa saldo</p><p className="text-lg font-bold">{fattureInAttesa}</p></div></CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center gap-3"><FileText className="w-8 h-8 text-gray-500" /><div><p className="text-xs text-gray-500">Totale documenti</p><p className="text-lg font-bold">{documenti.length}</p></div></CardContent></Card>
       </div>
 
       <Card>
@@ -112,11 +126,7 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
                   <Td>{d.cliente ? `${d.cliente.ragioneSociale || d.cliente.nome}${d.cliente.cognome ? ` ${d.cliente.cognome}` : ''}` : '-'}</Td>
                   <Td>{d.vendita ? `Vendita #${d.vendita.id}` : '-'}</Td>
                   <Td className="font-medium">{formatEuro(d.importoTotale)}</Td>
-                  <Td>
-                    <Badge variant={d.stato === 'bozza' ? 'warning' : d.stato === 'emesso' ? 'info' : 'success'}>
-                      {d.tipo === 'ddt' ? (d.stato === 'bozza' ? 'Bozza DDT' : d.stato === 'emesso' ? 'DDT Confermato' : 'Fattura Emessa') : (d.stato === 'bozza' ? 'Bozza Fattura' : d.stato === 'emesso' ? 'Fattura Emessa' : 'Pagata')}
-                    </Badge>
-                  </Td>
+                  <Td>{getStatoBadge(d)}</Td>
                   <Td>
                     <div className="flex gap-1">
                       <Link href={`/documenti/${d.id}`}><Button variant="ghost" size="sm"><Eye className="w-4 h-4" /></Button></Link>
@@ -126,8 +136,8 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
                         </Button>
                       )}
                       {d.tipo === 'fattura' && d.stato === 'emesso' && (
-                        <Button variant="ghost" size="sm" onClick={() => setPagaFattura({ fatturaId: d.id, dataPagamento: '', metodoPagamento: 'bonifico' })}>
-                          <CheckCircle className="w-3 h-3 mr-1" />Paga
+                        <Button variant="ghost" size="sm" onClick={() => setSaldaFattura({ fatturaId: d.id, dataPagamento: '', metodoPagamento: 'bonifico' })}>
+                          <CheckCircle className="w-3 h-3 mr-1" />Salda
                         </Button>
                       )}
                     </div>
@@ -140,17 +150,17 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
         </CardContent>
       </Card>
 
-      {pagaFattura && (
-        <Modal open={true} onClose={() => setPagaFattura(null)} title="Registra Pagamento">
+      {saldaFattura && (
+        <Modal open={true} onClose={() => setSaldaFattura(null)} title="Registra Incasso">
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">Registra il pagamento della fattura.</p>
+            <p className="text-sm text-gray-600">Registra il saldo ricevuto dal cliente per questa fattura.</p>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-sm font-medium block mb-1">Data pagamento</label><input type="date" value={pagaFattura.dataPagamento} onChange={e => setPagaFattura({ ...pagaFattura, dataPagamento: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
-              <div><label className="text-sm font-medium block mb-1">Metodo pagamento</label><select value={pagaFattura.metodoPagamento} onChange={e => setPagaFattura({ ...pagaFattura, metodoPagamento: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="bonifico">Bonifico</option><option value="contanti">Contanti</option><option value="carta">Carta</option><option value="rate">Rateale</option><option value="assegno">Assegno</option></select></div>
+              <div><label className="text-sm font-medium block mb-1">Data incasso</label><input type="date" value={saldaFattura.dataPagamento} onChange={e => setSaldaFattura({ ...saldaFattura, dataPagamento: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+              <div><label className="text-sm font-medium block mb-1">Metodo di pagamento</label><select value={saldaFattura.metodoPagamento} onChange={e => setSaldaFattura({ ...saldaFattura, metodoPagamento: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="bonifico">Bonifico</option><option value="contanti">Contanti</option><option value="carta">Carta</option><option value="rate">Rateale</option><option value="assegno">Assegno</option></select></div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setPagaFattura(null)}>Annulla</Button>
-              <Button type="button" onClick={() => handlePagaFattura(pagaFattura.fatturaId)} disabled={confermando !== null}>{confermando ? 'Registrazione...' : 'Conferma Pagamento'}</Button>
+              <Button type="button" variant="secondary" onClick={() => setSaldaFattura(null)}>Annulla</Button>
+              <Button type="button" onClick={() => handleSaldaFattura(saldaFattura.fatturaId)} disabled={confermando !== null}>{confermando ? 'Registrazione...' : 'Conferma Incasso'}</Button>
             </div>
           </div>
         </Modal>

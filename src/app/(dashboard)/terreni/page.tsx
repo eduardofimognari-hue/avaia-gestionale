@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
-import { MapPin, Globe, Map, Pencil, Trash2, Package, Ruler } from 'lucide-react'
+import { MapPin, Globe, Map, Pencil, Trash2, Package, Ruler, Droplets, TreePine, Sprout, CalendarDays } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const TerreniMap = dynamic(() => import('@/components/terreni-map').then(m => m.TerreniMap), {
@@ -17,6 +17,9 @@ const TerreniMap = dynamic(() => import('@/components/terreni-map').then(m => m.
 })
 
 type PolygonPath = { lat: number; lng: number }
+
+type SistemaIrrigazione = { id: number; nome: string }
+type PortaInnesto = { id: number; nome: string }
 
 type Terreno = {
   id: number
@@ -33,6 +36,13 @@ type Terreno = {
   prodottiIds: number[] | null
   luogoId: number | null
   luogo: { id: number; nome: string } | null
+  numeroPiante: number | null
+  annoImpianto: number | null
+  culturaVarieta: string | null
+  sistemaIrrigazioneId: number | null
+  sistemaIrrigazione: SistemaIrrigazione | null
+  portaInnestoId: number | null
+  portaInnesto: PortaInnesto | null
   note: string | null
 }
 
@@ -109,6 +119,8 @@ export default function TerreniPage() {
   const [data, setData] = useState<Terreno[]>([])
   const [luoghi, setLuoghi] = useState<Luogo[]>([])
   const [prodotti, setProdotti] = useState<Prodotto[]>([])
+  const [sistemiIrrigazione, setSistemiIrrigazione] = useState<SistemaIrrigazione[]>([])
+  const [portaInnesti, setPortaInnesti] = useState<PortaInnesto[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -144,19 +156,24 @@ export default function TerreniPage() {
   const [form, setForm] = useState({
     nome: '', superficie: '', unitaMisura: 'ha',
     indirizzo: '', comune: '', provincia: '', cap: '',
-    latitudine: '', longitudine: '', luogoId: '', note: '',
+    latitudine: '', longitudine: '', luogoId: '',
+    numeroPiante: '', annoImpianto: '', culturaVarieta: '',
+    sistemaIrrigazioneId: '', portaInnestoId: '', note: '',
   })
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const [res, resLuoghi, resProdotti] = await Promise.all([
+      const [res, resLuoghi, resProdotti, resSI, resPI] = await Promise.all([
         fetch('/api/terreni'), fetch('/api/luoghi'), fetch('/api/prodotti'),
+        fetch('/api/sistemi-irrigazione'), fetch('/api/porta-innesti'),
       ])
       if (!res.ok) throw new Error()
       setData(await res.json())
       if (resLuoghi.ok) setLuoghi(await resLuoghi.json())
       if (resProdotti.ok) setProdotti(await resProdotti.json())
+      if (resSI.ok) setSistemiIrrigazione(await resSI.json())
+      if (resPI.ok) setPortaInnesti(await resPI.json())
     } catch { setError('Errore caricamento dati') }
     finally { setLoading(false) }
   }, [])
@@ -404,6 +421,11 @@ export default function TerreniPage() {
       latitudine: t.latitudine?.toString() || '',
       longitudine: t.longitudine?.toString() || '',
       luogoId: t.luogoId?.toString() || '',
+      numeroPiante: t.numeroPiante?.toString() || '',
+      annoImpianto: t.annoImpianto?.toString() || '',
+      culturaVarieta: t.culturaVarieta || '',
+      sistemaIrrigazioneId: t.sistemaIrrigazioneId?.toString() || '',
+      portaInnestoId: t.portaInnestoId?.toString() || '',
       note: t.note || '',
     })
     setEditProdottiIds(t.prodottiIds || [])
@@ -426,6 +448,11 @@ export default function TerreniPage() {
         latitudine: form.latitudine ? parseFloat(form.latitudine) : null,
         longitudine: form.longitudine ? parseFloat(form.longitudine) : null,
         luogoId: form.luogoId ? parseInt(form.luogoId) : null,
+        numeroPiante: form.numeroPiante ? parseInt(form.numeroPiante) : null,
+        annoImpianto: form.annoImpianto ? parseInt(form.annoImpianto) : null,
+        culturaVarieta: form.culturaVarieta || null,
+        sistemaIrrigazioneId: form.sistemaIrrigazioneId ? parseInt(form.sistemaIrrigazioneId) : null,
+        portaInnestoId: form.portaInnestoId ? parseInt(form.portaInnestoId) : null,
         note: form.note || null,
         prodottiIds: editProdottiIds.length > 0 ? editProdottiIds : null,
       }
@@ -642,13 +669,48 @@ export default function TerreniPage() {
                     : '-'}
                 </span>
               </div>
-              {summaryItem.note && (
-                <div className="col-span-2">
-                  <span className="text-gray-500 block text-xs">Note</span>
-                  <span className="font-medium">{summaryItem.note}</span>
-                </div>
-              )}
             </div>
+            {/* Dati agronomici */}
+            {(summaryItem.numeroPiante || summaryItem.annoImpianto || summaryItem.culturaVarieta || summaryItem.sistemaIrrigazione || summaryItem.portaInnesto) && (
+              <div className="mt-4 pt-4 border-t grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                {summaryItem.culturaVarieta && (
+                  <div>
+                    <span className="text-gray-500 block text-xs flex items-center gap-1"><Sprout className="w-3 h-3" />Coltura / Varietà</span>
+                    <span className="font-medium">{summaryItem.culturaVarieta}</span>
+                  </div>
+                )}
+                {summaryItem.numeroPiante && (
+                  <div>
+                    <span className="text-gray-500 block text-xs">N° piante</span>
+                    <span className="font-medium">{summaryItem.numeroPiante.toLocaleString('it-IT')}</span>
+                  </div>
+                )}
+                {summaryItem.annoImpianto && (
+                  <div>
+                    <span className="text-gray-500 block text-xs flex items-center gap-1"><CalendarDays className="w-3 h-3" />Anno impianto</span>
+                    <span className="font-medium">{summaryItem.annoImpianto}</span>
+                  </div>
+                )}
+                {summaryItem.portaInnesto && (
+                  <div>
+                    <span className="text-gray-500 block text-xs flex items-center gap-1"><TreePine className="w-3 h-3" />Porta innesto</span>
+                    <span className="font-medium">{summaryItem.portaInnesto.nome}</span>
+                  </div>
+                )}
+                {summaryItem.sistemaIrrigazione && (
+                  <div>
+                    <span className="text-gray-500 block text-xs flex items-center gap-1"><Droplets className="w-3 h-3" />Sistema irrigazione</span>
+                    <span className="font-medium">{summaryItem.sistemaIrrigazione.nome}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {summaryItem.note && (
+              <div className="mt-4 pt-4 border-t text-sm">
+                <span className="text-gray-500 block text-xs">Note</span>
+                <span className="font-medium">{summaryItem.note}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -783,7 +845,6 @@ export default function TerreniPage() {
             <div><label className="text-sm font-medium block mb-1">Provincia</label><Input value={form.provincia} onChange={e => setForm({ ...form, provincia: e.target.value })} /></div>
             <div><label className="text-sm font-medium block mb-1">CAP</label><Input value={form.cap} onChange={e => setForm({ ...form, cap: e.target.value })} /></div>
           </div>
-          <div><label className="text-sm font-medium block mb-1">Note</label><Input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
           <div>
             <label className="text-sm font-medium block mb-1">Fondo di appartenenza</label>
             <Select value={form.luogoId} onChange={e => setForm({ ...form, luogoId: e.target.value })}>
@@ -792,6 +853,45 @@ export default function TerreniPage() {
             </Select>
             {luoghiRealiProduttivi.length === 0 && <p className="text-xs text-amber-600 mt-1">Nessun luogo reale/produttivo. Creane uno in Anagrafiche → Luoghi.</p>}
           </div>
+
+          {/* Dati agronomici stacco */}
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Dati agronomici</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium block mb-1">Coltura / Varietà</label>
+                <Input value={form.culturaVarieta} onChange={e => setForm({ ...form, culturaVarieta: e.target.value })} placeholder="Es. Clementine Nules, Olea Europaea…" />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">N° piante</label>
+                <Input type="number" min="0" step="1" value={form.numeroPiante} onChange={e => setForm({ ...form, numeroPiante: e.target.value })} placeholder="Es. 120" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className="text-sm font-medium block mb-1">Anno impianto / innesto</label>
+                <Input type="number" min="1900" max="2100" step="1" value={form.annoImpianto} onChange={e => setForm({ ...form, annoImpianto: e.target.value })} placeholder="Es. 2005" />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1 flex items-center gap-1"><TreePine className="w-3.5 h-3.5 text-green-600" />Porta innesto</label>
+                <Select value={form.portaInnestoId} onChange={e => setForm({ ...form, portaInnestoId: e.target.value })}>
+                  <option value="">Nessuno</option>
+                  {portaInnesti.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                </Select>
+                {portaInnesti.length === 0 && <p className="text-xs text-amber-600 mt-1">Aggiungi porta innesti in Anagrafiche → Porta Innesti</p>}
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="text-sm font-medium block mb-1 flex items-center gap-1"><Droplets className="w-3.5 h-3.5 text-blue-500" />Sistema di irrigazione</label>
+              <Select value={form.sistemaIrrigazioneId} onChange={e => setForm({ ...form, sistemaIrrigazioneId: e.target.value })}>
+                <option value="">Nessuno</option>
+                {sistemiIrrigazione.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+              </Select>
+              {sistemiIrrigazione.length === 0 && <p className="text-xs text-amber-600 mt-1">Aggiungi sistemi in Anagrafiche → Sistemi di Irrigazione</p>}
+            </div>
+          </div>
+
+          <div><label className="text-sm font-medium block mb-1">Note</label><Input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => { setEditModalOpen(false); setSelectedItem(null) }}>Annulla</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Aggiorna'}</Button>

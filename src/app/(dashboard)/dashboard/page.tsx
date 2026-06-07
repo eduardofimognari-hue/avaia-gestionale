@@ -7,6 +7,7 @@ import { Euro, Package, Users, AlertTriangle, ShoppingCart, TrendingUp, Trending
 import { DashboardChart } from './dashboard-chart'
 import { formatEuro, formatDate, formatNumber } from '@/lib/utils'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 
 async function getStats(aziendaId: number) {
   const now = new Date()
@@ -80,94 +81,114 @@ export default async function DashboardPage() {
       {/* Avvisi critici */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         {s.debitiScaduti.length > 0 && (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
-                <h3 className="font-semibold text-red-800 text-sm">Debiti clienti scaduti ({s.debitiScaduti.length})</h3>
-              </div>
-              <div className="space-y-1">
-                {s.debitiScaduti.map((d) => (
-                  <div key={d.id} className="flex items-center justify-between text-sm">
-                    <span className="text-red-700">{d.cliente?.nome} {d.cliente?.cognome || ''}</span>
-                    <span className="font-medium text-red-800">{formatEuro(Number(d.importo))}</span>
+          <Link href="/crediti-debiti" className="block group">
+            <Card className="border-red-200 bg-red-50 group-hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <h3 className="font-semibold text-red-800 text-sm">Debiti clienti scaduti ({s.debitiScaduti.length})</h3>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <span className="text-xs text-red-400 group-hover:text-red-600">Vai a Crediti/Debiti →</span>
+                </div>
+                <div className="space-y-1">
+                  {s.debitiScaduti.map((d) => (
+                    <div key={d.id} className="flex items-center justify-between text-sm">
+                      <span className="text-red-700">{d.cliente?.nome} {d.cliente?.cognome || ''}</span>
+                      <span className="font-medium text-red-800">{formatEuro(Number(d.importo))}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         )}
 
         {s.fattureNonPagate.length > 0 && (
-          <Card className="border-amber-200 bg-amber-50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Receipt className="w-5 h-5 text-amber-600" />
-                <h3 className="font-semibold text-amber-800 text-sm">Fatture non pagate ({s.fattureNonPagate.length})</h3>
-              </div>
-              <div className="space-y-1">
-                {s.fattureNonPagate.slice(0, 5).map((v) => (
-                  <div key={v.id} className="flex items-center justify-between text-sm">
-                    <span className="text-amber-700">{v.cliente?.nome} {v.cliente?.cognome || ''}</span>
-                    <div className="text-right">
-                      <span className="font-medium text-amber-800 block">{formatEuro(Number(v.importoTotale || 0))}</span>
-                      {v.dataPagamentoPrevista && (
-                        <span className="text-[10px] text-amber-600">Entro {formatDate(v.dataPagamentoPrevista)}</span>
-                      )}
-                    </div>
+          <Link href="/documenti" className="block group">
+            <Card className="border-amber-200 bg-amber-50 group-hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="w-5 h-5 text-amber-600" />
+                    <h3 className="font-semibold text-amber-800 text-sm">Fatture in attesa saldo ({s.fattureNonPagate.length})</h3>
                   </div>
-                ))}
-                {s.fattureNonPagate.length > 5 && (
-                  <p className="text-xs text-amber-600 text-center pt-1">+{s.fattureNonPagate.length - 5} altre fatture</p>
-                )}
-              </div>
-              <div className="mt-2 pt-2 border-t border-amber-200 flex justify-between text-sm font-medium">
-                <span className="text-amber-800">Totale atteso</span>
-                <span className="text-amber-900 font-bold">{formatEuro(totFattureNonPagate)}</span>
-              </div>
-            </CardContent>
-          </Card>
+                  <span className="text-xs text-amber-400 group-hover:text-amber-600">Vai a DDT e Fatture →</span>
+                </div>
+                <div className="space-y-1">
+                  {s.fattureNonPagate.slice(0, 5).map((v) => (
+                    <div key={v.id} className="flex items-center justify-between text-sm">
+                      <span className="text-amber-700">{v.cliente?.nome} {v.cliente?.cognome || ''}</span>
+                      <div className="text-right">
+                        <span className="font-medium text-amber-800 block">{formatEuro(Number(v.importoTotale || 0))}</span>
+                        {v.dataPagamentoPrevista && (
+                          <span className="text-[10px] text-amber-600">Entro {formatDate(v.dataPagamentoPrevista)}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {s.fattureNonPagate.length > 5 && (
+                    <p className="text-xs text-amber-600 text-center pt-1">+{s.fattureNonPagate.length - 5} altre fatture</p>
+                  )}
+                </div>
+                <div className="mt-2 pt-2 border-t border-amber-200 flex justify-between text-sm font-medium">
+                  <span className="text-amber-800">Totale da incassare</span>
+                  <span className="text-amber-900 font-bold">{formatEuro(totFattureNonPagate)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         )}
 
         {s.prodottiScortaBassa.length > 0 && (
-          <Card className="border-amber-200 bg-amber-50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <PackageOpen className="w-5 h-5 text-amber-600" />
-                <h3 className="font-semibold text-amber-800 text-sm">Prodotti esauriti ({s.prodottiScortaBassa.length})</h3>
-              </div>
-              <div className="space-y-1">
-                {s.prodottiScortaBassa.map((p, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="text-amber-700">{p.nome}{p.varieta ? ` - ${p.varieta}` : ''}</span>
-                    <span className="font-medium text-amber-800">{formatNumber(p.giacenza)}</span>
+          <Link href="/magazzino" className="block group">
+            <Card className="border-amber-200 bg-amber-50 group-hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <PackageOpen className="w-5 h-5 text-amber-600" />
+                    <h3 className="font-semibold text-amber-800 text-sm">Prodotti esauriti ({s.prodottiScortaBassa.length})</h3>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <span className="text-xs text-amber-400 group-hover:text-amber-600">Vai a Magazzino →</span>
+                </div>
+                <div className="space-y-1">
+                  {s.prodottiScortaBassa.map((p, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="text-amber-700">{p.nome}{p.varieta ? ` - ${p.varieta}` : ''}</span>
+                      <span className="font-medium text-amber-800">{formatNumber(p.giacenza)}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         )}
 
         {s.rateInScadenza.length > 0 && (
-          <Card className="border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <CalendarClock className="w-5 h-5 text-blue-600" />
-                <h3 className="font-semibold text-blue-800 text-sm">Rate in scadenza ({s.rateInScadenza.length})</h3>
-              </div>
-              <div className="space-y-1">
-                {s.rateInScadenza.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between text-sm">
-                    <span className="text-blue-700">Rata {r.nota || `#${r.id}`}</span>
-                    <div className="text-right">
-                      <span className="font-medium text-blue-800 block">{formatEuro(Number(r.importo))}</span>
-                      {r.scadenza && <span className="text-[10px] text-blue-600">{formatDate(r.scadenza)}</span>}
-                    </div>
+          <Link href="/contabilita" className="block group">
+            <Card className="border-blue-200 bg-blue-50 group-hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <CalendarClock className="w-5 h-5 text-blue-600" />
+                    <h3 className="font-semibold text-blue-800 text-sm">Rate in scadenza ({s.rateInScadenza.length})</h3>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <span className="text-xs text-blue-400 group-hover:text-blue-600">Vai a Contabilità →</span>
+                </div>
+                <div className="space-y-1">
+                  {s.rateInScadenza.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between text-sm">
+                      <span className="text-blue-700">Rata {r.nota || `#${r.id}`}</span>
+                      <div className="text-right">
+                        <span className="font-medium text-blue-800 block">{formatEuro(Number(r.importo))}</span>
+                        {r.scadenza && <span className="text-[10px] text-blue-600">{formatDate(r.scadenza)}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         )}
       </div>
 
