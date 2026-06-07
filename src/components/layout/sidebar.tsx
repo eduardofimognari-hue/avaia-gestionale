@@ -1,6 +1,6 @@
 'use client'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, Landmark, ShoppingCart, Euro, Receipt, Hammer, Sprout, Warehouse, MapPin, FileText, Shield, LogOut, X, Menu, BarChart3, Bug, Wrench } from 'lucide-react'
+import { LayoutDashboard, Users, Landmark, ShoppingCart, Euro, Receipt, Hammer, Sprout, Warehouse, MapPin, FileText, Shield, LogOut, X, Menu, BarChart3, Wallet } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -25,7 +25,8 @@ const groups: { title: string; items: NavItem[] }[] = [
       { label: 'Vendite', icon: ShoppingCart, href: '/vendite', color: 'text-sky-600' },
       { label: 'DDT / Fatture', icon: FileText, href: '/documenti', color: 'text-cyan-600' },
       { label: 'Listino Prezzi', icon: Euro, href: '/listino', color: 'text-amber-600' },
-      { label: 'Liquidaz. Debiti/Crediti', icon: Receipt, href: '/liquidazioni-soci', color: 'text-rose-600' },
+      { label: 'Liquidazioni Soci', icon: Receipt, href: '/liquidazioni-soci', color: 'text-rose-600' },
+      { label: 'Crediti / Debiti Esterni', icon: Wallet, href: '/crediti-debiti', color: 'text-orange-600' },
       { label: 'Lavoro Soci', icon: Hammer, href: '/lavoro-soci', color: 'text-stone-600' },
     ],
   },

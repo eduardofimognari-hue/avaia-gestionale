@@ -36,15 +36,60 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const body = await request.json()
 
     if (body.azione === 'conferma' && doc.tipo === 'ddt') {
-      const updated = await prisma.documenti.update({
-        where: { id },
-        data: { stato: 'emesso' },
-        include: {
-          vendita: { include: { cliente: true, righe: { include: { prodotto: true } } } },
-          cliente: true,
-        },
+      const result = await prisma.$transaction(async (tx) => {
+        const updated = await tx.documenti.update({
+          where: { id },
+          data: { stato: 'emesso' },
+        })
+
+        const anno = new Date().getFullYear()
+        const ultima = await tx.documenti.findFirst({
+          where: { aziendaId, tipo: 'fattura', anno },
+          orderBy: { numero: 'desc' },
+          select: { numero: true },
+        })
+        const numero = (ultima?.numero ?? 0) + 1
+
+        const fattura = await tx.documenti.create({
+          data: {
+            tipo: 'fattura', numero, anno,
+            data: new Date(),
+            venditaId: doc.venditaId,
+            clienteId: doc.clienteId,
+            importoTotale: doc.importoTotale,
+            stato: 'emesso',
+            note: `Generata automaticamente da DDT #${doc.numero}/${doc.anno}`,
+            aziendaId,
+          },
+        })
+
+        if (doc.venditaId) {
+          await tx.vendite.update({
+            where: { id: doc.venditaId },
+            data: { statoFattura: 'fatturato' },
+          })
+        }
+
+        if (doc.clienteId) {
+          await tx.debitiAperti.create({
+            data: {
+              data: new Date(),
+              clienteId: doc.clienteId,
+              importo: doc.importoTotale,
+              descrizione: `Fattura #${fattura.numero}/${fattura.anno} (da DDT #${doc.numero}/${doc.anno})`,
+              scadenza: null,
+              stato: 'aperto',
+              venditaId: doc.venditaId ?? null,
+              tipo: 'cliente',
+              aziendaId,
+            },
+          })
+        }
+
+        return { ddt: updated, fattura }
       })
-      return NextResponse.json(updated)
+
+      return NextResponse.json(result)
     }
 
     if (body.azione === 'emetti_fattura' && doc.tipo === 'ddt') {

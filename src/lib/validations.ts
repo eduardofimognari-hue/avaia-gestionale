@@ -166,6 +166,7 @@ export const raccoltaSchema = z.object({
   quantita: z.number().positive('Quantità deve essere positiva'),
   unitaMisura: z.string().optional().default('kg'),
   luogoId: z.number().optional().nullable(),
+  areaId: z.number().optional().nullable(),
   socioId: z.number().optional().nullable(),
   note: z.string().optional().nullable(),
 })

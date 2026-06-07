@@ -28,7 +28,7 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
   const [error, setError] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
   const [form, setForm] = useState({ tipo: 'ddt', venditaId: '', data: '', note: '' })
-  const [emettiFattura, setEmettiFattura] = useState<{ ddtId: number; dataPagamento: string; metodoPagamento: string } | null>(null)
+  const [pagaFattura, setPagaFattura] = useState<{ fatturaId: number; dataPagamento: string; metodoPagamento: string } | null>(null)
 
   async function refreshDocumenti() {
     const res = await fetch('/api/documenti')
@@ -54,7 +54,7 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
   }
 
   async function handleConfermaDDT(docId: number) {
-    if (!confirm('Confermi il DDT? Non sarà più modificabile e verrà preparata la fattura.')) return
+    if (!confirm('Confermi il DDT? Verrà generata automaticamente la fattura associata.')) return
     setConfermando(docId)
     try {
       const res = await fetch(`/api/documenti/${docId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ azione: 'conferma' }) })
@@ -64,19 +64,18 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
     finally { setConfermando(null) }
   }
 
-  async function handleEmettiFattura(docId: number) {
-    if (!emettiFattura) return
-    if (!confirm(`Emetti fattura per DDT #${docId}?`)) return
+  async function handlePagaFattura(docId: number) {
+    if (!pagaFattura) return
     setConfermando(docId)
     try {
       const res = await fetch(`/api/documenti/${docId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ azione: 'emetti_fattura', dataPagamentoPrevista: emettiFattura.dataPagamento || null, metodoPagamento: emettiFattura.metodoPagamento || 'bonifico' }),
+        body: JSON.stringify({ azione: 'paga', dataPagamento: pagaFattura.dataPagamento || null, metodoPagamento: pagaFattura.metodoPagamento || 'bonifico' }),
       })
       if (!res.ok) throw new Error()
-      setEmettiFattura(null)
+      setPagaFattura(null)
       await refreshDocumenti()
-    } catch { setError('Errore durante emissione fattura') }
+    } catch { setError('Errore durante registrazione pagamento') }
     finally { setConfermando(null) }
   }
 
@@ -126,9 +125,9 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
                           {confermando === d.id ? '...' : <><CheckCircle className="w-3 h-3 mr-1" />Conferma DDT</>}
                         </Button>
                       )}
-                      {d.tipo === 'ddt' && d.stato === 'emesso' && (
-                        <Button variant="ghost" size="sm" onClick={() => setEmettiFattura({ ddtId: d.id, dataPagamento: '', metodoPagamento: 'bonifico' })}>
-                          <FileSpreadsheet className="w-3 h-3 mr-1" />Emetti Fattura
+                      {d.tipo === 'fattura' && d.stato === 'emesso' && (
+                        <Button variant="ghost" size="sm" onClick={() => setPagaFattura({ fatturaId: d.id, dataPagamento: '', metodoPagamento: 'bonifico' })}>
+                          <CheckCircle className="w-3 h-3 mr-1" />Paga
                         </Button>
                       )}
                     </div>
@@ -141,17 +140,17 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
         </CardContent>
       </Card>
 
-      {emettiFattura && (
-        <Modal open={true} onClose={() => setEmettiFattura(null)} title="Emetti Fattura">
+      {pagaFattura && (
+        <Modal open={true} onClose={() => setPagaFattura(null)} title="Registra Pagamento">
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">Conferma i dati per emettere la fattura dal DDT #{emettiFattura.ddtId}.</p>
+            <p className="text-sm text-gray-600">Registra il pagamento della fattura.</p>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-sm font-medium block mb-1">Data pagamento prevista</label><input type="date" value={emettiFattura.dataPagamento} onChange={e => setEmettiFattura({ ...emettiFattura, dataPagamento: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
-              <div><label className="text-sm font-medium block mb-1">Metodo pagamento</label><select value={emettiFattura.metodoPagamento} onChange={e => setEmettiFattura({ ...emettiFattura, metodoPagamento: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="bonifico">Bonifico</option><option value="contanti">Contanti</option><option value="carta">Carta</option><option value="rate">Rateale</option><option value="assegno">Assegno</option></select></div>
+              <div><label className="text-sm font-medium block mb-1">Data pagamento</label><input type="date" value={pagaFattura.dataPagamento} onChange={e => setPagaFattura({ ...pagaFattura, dataPagamento: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+              <div><label className="text-sm font-medium block mb-1">Metodo pagamento</label><select value={pagaFattura.metodoPagamento} onChange={e => setPagaFattura({ ...pagaFattura, metodoPagamento: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="bonifico">Bonifico</option><option value="contanti">Contanti</option><option value="carta">Carta</option><option value="rate">Rateale</option><option value="assegno">Assegno</option></select></div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setEmettiFattura(null)}>Annulla</Button>
-              <Button type="button" onClick={() => handleEmettiFattura(emettiFattura.ddtId)} disabled={confermando !== null}>{confermando ? 'Emissione...' : 'Emetti Fattura'}</Button>
+              <Button type="button" variant="secondary" onClick={() => setPagaFattura(null)}>Annulla</Button>
+              <Button type="button" onClick={() => handlePagaFattura(pagaFattura.fatturaId)} disabled={confermando !== null}>{confermando ? 'Registrazione...' : 'Conferma Pagamento'}</Button>
             </div>
           </div>
         </Modal>

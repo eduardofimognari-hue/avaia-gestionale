@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
-import { Plus, Sprout, MapPin, User, Package } from 'lucide-react'
+import { Plus, Sprout, MapPin, User } from 'lucide-react'
 import { formatDate, formatNumber } from '@/lib/utils'
 
 type Raccolta = {
@@ -19,12 +19,14 @@ type Raccolta = {
   quantita: number
   unitaMisura: string
   luogo: { id: number; nome: string } | null
+  area: { id: number; nome: string } | null
   socio: { id: number; nome: string; cognome: string } | null
   note: string | null
 }
 
 type Prodotto = { id: number; nome: string; varietaTipologia: string | null; unitaMisura: string }
 type Luogo = { id: number; nome: string }
+type Area = { id: number; nome: string }
 type Socio = { id: number; nome: string; cognome: string }
 
 export default function RaccoltaPage() {
@@ -33,40 +35,41 @@ export default function RaccoltaPage() {
   const [totali, setTotali] = useState<{ prodottoId: number; _sum: { quantita: number | null } }[]>([])
   const [prodottiList, setProdottiList] = useState<Prodotto[]>([])
   const [luoghi, setLuoghi] = useState<Luogo[]>([])
+  const [aree, setAree] = useState<Area[]>([])
   const [soci, setSoci] = useState<Socio[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ data: '', prodottoId: '', quantita: '', unitaMisura: 'kg', luogoId: '', socioId: '', note: '' })
+  const [form, setForm] = useState({
+    data: '', prodottoId: '', quantita: '', unitaMisura: 'kg',
+    luogoId: '', areaId: '', socioId: '', note: '',
+  })
 
   async function fetchData() {
     try {
       setLoading(true)
-      const [resRaccolta, resProdotti, resLuoghi, resSoci] = await Promise.all([
+      const [resRaccolta, resProdotti, resLuoghi, resAree, resSoci] = await Promise.all([
         fetch('/api/raccolta'),
         fetch('/api/prodotti'),
         fetch('/api/luoghi'),
+        fetch('/api/aree'),
         fetch('/api/soci'),
       ])
-      if (!resRaccolta.ok || !resProdotti.ok || !resLuoghi.ok || !resSoci.ok) throw new Error()
+      if (!resRaccolta.ok || !resProdotti.ok || !resLuoghi.ok || !resAree.ok || !resSoci.ok) throw new Error()
       const dataR = await resRaccolta.json()
       setRaccolte(dataR.raccolte)
       setTotali(dataR.totali)
       setProdotti(dataR.prodotti)
       setProdottiList(await resProdotti.json())
       setLuoghi(await resLuoghi.json())
+      setAree(await resAree.json())
       setSoci(await resSoci.json())
     } catch { setError('Errore caricamento dati') }
     finally { setLoading(false) }
   }
 
   useEffect(() => { fetchData() }, [])
-
-  function getTotaleProdotto(prodottoId: number) {
-    const t = totali.find(t => t.prodottoId === prodottoId)
-    return t?._sum.quantita ?? 0
-  }
 
   function getProdottoInfo(prodottoId: number) {
     return prodotti.find(p => p.id === prodottoId)
@@ -82,13 +85,14 @@ export default function RaccoltaPage() {
         quantita: parseFloat(form.quantita),
         unitaMisura: form.unitaMisura,
         luogoId: form.luogoId ? parseInt(form.luogoId) : null,
+        areaId: form.areaId ? parseInt(form.areaId) : null,
         socioId: form.socioId ? parseInt(form.socioId) : null,
         note: form.note || null,
       }
       const res = await fetch('/api/raccolta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
       setModalOpen(false)
-      setForm({ data: '', prodottoId: '', quantita: '', unitaMisura: 'kg', luogoId: '', socioId: '', note: '' })
+      setForm({ data: '', prodottoId: '', quantita: '', unitaMisura: 'kg', luogoId: '', areaId: '', socioId: '', note: '' })
       await fetchData()
     } catch (err: any) { setError(err.message || 'Errore') }
     finally { setSaving(false) }
@@ -103,7 +107,6 @@ export default function RaccoltaPage() {
         <p className="text-gray-500">Caricamento...</p>
       ) : (
         <>
-          {/* Totali per prodotto */}
           <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Totali raccolti</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {totali.map((t) => {
@@ -126,7 +129,6 @@ export default function RaccoltaPage() {
             )}
           </div>
 
-          {/* Registrazioni */}
           <Card>
             <CardHeader><h3 className="font-semibold">Registrazioni</h3></CardHeader>
             <CardContent className="p-0">
@@ -137,6 +139,7 @@ export default function RaccoltaPage() {
                     <Th>Prodotto</Th>
                     <Th>Quantità</Th>
                     <Th>Luogo</Th>
+                    <Th>Area</Th>
                     <Th>Socio</Th>
                     <Th>Note</Th>
                   </Tr>
@@ -153,11 +156,12 @@ export default function RaccoltaPage() {
                       </Td>
                       <Td className="font-medium">{formatNumber(r.quantita)} {r.unitaMisura}</Td>
                       <Td>{r.luogo ? <><MapPin className="w-3 h-3 inline mr-1 text-gray-400" />{r.luogo.nome}</> : '-'}</Td>
+                      <Td>{r.area ? <Badge variant="default">{r.area.nome}</Badge> : '-'}</Td>
                       <Td>{r.socio ? <><User className="w-3 h-3 inline mr-1 text-gray-400" />{r.socio.nome} {r.socio.cognome}</> : '-'}</Td>
                       <Td className="text-gray-500 text-xs">{r.note || '-'}</Td>
                     </Tr>
                   ))}
-                  {raccolte.length === 0 && <Tr><Td colSpan={6} className="text-center text-gray-500 py-8">Nessuna raccolta registrata</Td></Tr>}
+                  {raccolte.length === 0 && <Tr><Td colSpan={7} className="text-center text-gray-500 py-8">Nessuna raccolta registrata</Td></Tr>}
                 </Tbody>
               </Table>
             </CardContent>
@@ -200,19 +204,26 @@ export default function RaccoltaPage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium block mb-1">Luogo provenienza</label>
+              <label className="text-sm font-medium block mb-1">Luogo produttivo</label>
               <Select value={form.luogoId} onChange={e => setForm({ ...form, luogoId: e.target.value })}>
                 <option value="">Seleziona...</option>
                 {luoghi.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium block mb-1">Socio raccoglitore</label>
-              <Select value={form.socioId} onChange={e => setForm({ ...form, socioId: e.target.value })}>
-                <option value="">Seleziona...</option>
-                {soci.map((s) => <option key={s.id} value={s.id}>{s.nome} {s.cognome}</option>)}
+              <label className="text-sm font-medium block mb-1">Area (opzionale)</label>
+              <Select value={form.areaId} onChange={e => setForm({ ...form, areaId: e.target.value })}>
+                <option value="">Nessuna area</option>
+                {aree.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}
               </Select>
             </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Socio raccoglitore</label>
+            <Select value={form.socioId} onChange={e => setForm({ ...form, socioId: e.target.value })}>
+              <option value="">Seleziona...</option>
+              {soci.map((s) => <option key={s.id} value={s.id}>{s.nome} {s.cognome}</option>)}
+            </Select>
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">Note</label>

@@ -8,12 +8,12 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
-import { Plus, ArrowUpCircle, ArrowDownCircle, CheckCircle, Users } from 'lucide-react'
+import { Plus, ArrowUpCircle, ArrowDownCircle, CheckCircle, Wallet, Building2 } from 'lucide-react'
 import { formatDate, formatEuro } from '@/lib/utils'
 
 type Liquidazione = {
   id: number; data: string; tipo: string
-  socio?: { id: number; nome: string; cognome: string }
+  cliente?: { id: number; nome: string; cognome: string | null }
   totaleCrediti: number; totaleDebiti: number; importoNetto: number
   periodoDa: string | null; periodoA: string | null
   stato: string; dataPagamento: string | null; note: string | null
@@ -21,35 +21,35 @@ type Liquidazione = {
   movimentoCassa: { id: number; importo: number; tipo: string; data: string } | null
 }
 
-type Socio = { id: number; nome: string; cognome: string }
+type Cliente = { id: number; nome: string; cognome: string | null }
 
-export default function LiquidazioniSociPage() {
+export default function CreditiDebitiPage() {
   const [liquidazioni, setLiquidazioni] = useState<Liquidazione[]>([])
-  const [soci, setSoci] = useState<Socio[]>([])
+  const [clienti, setClienti] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [pagando, setPagando] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [expanded, setExpanded] = useState<number | null>(null)
-  const [totaleCreditiSoci, setTotaleCreditiSoci] = useState(0)
-  const [totaleDebitiSoci, setTotaleDebitiSoci] = useState(0)
-  const [form, setForm] = useState({ data: '', socioId: '', tipoMovimento: 'credito', importo: '', note: '' })
+  const [totaleCreditiClienti, setTotaleCreditiClienti] = useState(0)
+  const [totaleDebitiFornitori, setTotaleDebitiFornitori] = useState(0)
+  const [form, setForm] = useState({ data: '', clienteId: '', tipoMovimento: 'credito', importo: '', note: '' })
 
   async function fetchData() {
     try {
       setLoading(true)
-      const [resLiq, resSoci] = await Promise.all([
+      const [resLiq, resClienti] = await Promise.all([
         fetch('/api/liquidazioni-soci'),
-        fetch('/api/soci'),
+        fetch('/api/clienti'),
       ])
-      if (!resLiq.ok || !resSoci.ok) throw new Error()
+      if (!resLiq.ok || !resClienti.ok) throw new Error()
       const liqData = await resLiq.json()
       const tutte = liqData.liquidazioni ?? liqData
-      setLiquidazioni(tutte.filter((l: Liquidazione) => l.tipo === 'interna'))
-      setTotaleCreditiSoci(liqData.totaleCreditiSoci ?? 0)
-      setTotaleDebitiSoci(liqData.totaleDebitiSoci ?? 0)
-      setSoci(await resSoci.json())
+      setLiquidazioni(tutte.filter((l: Liquidazione) => l.tipo === 'esterna'))
+      setTotaleCreditiClienti(liqData.totaleCreditiClienti ?? 0)
+      setTotaleDebitiFornitori(liqData.totaleDebitiFornitori ?? 0)
+      setClienti(await resClienti.json())
     } catch { setError('Errore caricamento dati') }
     finally { setLoading(false) }
   }
@@ -62,16 +62,16 @@ export default function LiquidazioniSociPage() {
     try {
       const body = {
         data: new Date(form.data).toISOString(),
-        tipo: 'interna',
+        tipo: 'esterna',
         tipoMovimento: form.tipoMovimento,
         importo: parseFloat(form.importo),
-        socioId: parseInt(form.socioId),
+        clienteId: parseInt(form.clienteId),
         note: form.note || null,
       }
       const res = await fetch('/api/liquidazioni-soci', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) throw new Error()
       setModalOpen(false)
-      setForm({ data: '', socioId: '', tipoMovimento: 'credito', importo: '', note: '' })
+      setForm({ data: '', clienteId: '', tipoMovimento: 'credito', importo: '', note: '' })
       await fetchData()
     } catch { setError('Errore durante il salvataggio') }
     finally { setSaving(false) }
@@ -94,32 +94,24 @@ export default function LiquidazioniSociPage() {
 
   return (
     <div>
-      <PageHeader title="Liquidazioni Soci" description="Gestione crediti e debiti interni con i soci" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Liquidazione</Button>} />
+      <PageHeader title="Crediti e Debiti Esterni" description="Gestione crediti verso clienti e debiti verso fornitori" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuovo Movimento</Button>} />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       {loading ? (<p className="text-gray-500">Caricamento...</p>) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-primary-50 p-2 text-primary-600"><Users className="w-5 h-5" /></div>
-                  <div><p className="text-xs text-gray-500 uppercase tracking-wide">Soci</p><p className="text-xl font-bold">{liquidazioni.length}</p></div>
+                  <div className="rounded-lg bg-blue-50 p-2 text-blue-600"><Wallet className="w-5 h-5" /></div>
+                  <div><p className="text-xs text-gray-500 uppercase tracking-wide">Crediti verso clienti</p><p className="text-xl font-bold text-blue-700">{formatEuro(totaleCreditiClienti)}</p></div>
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-green-50 p-2 text-green-600"><ArrowUpCircle className="w-5 h-5" /></div>
-                  <div><p className="text-xs text-gray-500 uppercase tracking-wide">Crediti soci</p><p className="text-xl font-bold text-green-700">{formatEuro(totaleCreditiSoci)}</p></div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-red-50 p-2 text-red-600"><ArrowDownCircle className="w-5 h-5" /></div>
-                  <div><p className="text-xs text-gray-500 uppercase tracking-wide">Debiti soci</p><p className="text-xl font-bold text-red-700">{formatEuro(totaleDebitiSoci)}</p></div>
+                  <div className="rounded-lg bg-orange-50 p-2 text-orange-600"><Building2 className="w-5 h-5" /></div>
+                  <div><p className="text-xs text-gray-500 uppercase tracking-wide">Debiti verso fornitori</p><p className="text-xl font-bold text-orange-700">{formatEuro(totaleDebitiFornitori)}</p></div>
                 </div>
               </CardContent>
             </Card>
@@ -129,14 +121,14 @@ export default function LiquidazioniSociPage() {
             <CardContent className="p-0">
               <Table>
                 <Thead>
-                  <Tr><Th>Data</Th><Th>Socio</Th><Th>Movimento</Th><Th>Importo</Th><Th>Note</Th><Th>Stato</Th><Th></Th></Tr>
+                  <Tr><Th>Data</Th><Th>Soggetto</Th><Th>Movimento</Th><Th>Importo</Th><Th>Note</Th><Th>Stato</Th><Th></Th></Tr>
                 </Thead>
                 <Tbody>
                   {liquidazioni.map((l) => (
                     <>
                       <Tr key={l.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setExpanded(expanded === l.id ? null : l.id)}>
                         <Td>{formatDate(l.data)}</Td>
-                        <Td className="font-medium">{l.socio ? `${l.socio.nome} ${l.socio.cognome}` : '-'}</Td>
+                        <Td className="font-medium">{l.cliente ? `${l.cliente.nome} ${l.cliente.cognome || ''}` : '-'}</Td>
                         <Td>
                           {l.importoNetto >= 0
                             ? <Badge variant="info"><ArrowUpCircle className="w-3 h-3 mr-1" />Credito</Badge>
@@ -181,22 +173,22 @@ export default function LiquidazioniSociPage() {
                       )}
                     </>
                   ))}
-                  {liquidazioni.length === 0 && <Tr><Td colSpan={7} className="text-center text-gray-500 py-8">Nessuna liquidazione soci trovata</Td></Tr>}
+                  {liquidazioni.length === 0 && <Tr><Td colSpan={7} className="text-center text-gray-500 py-8">Nessun credito o debito esterno registrato</Td></Tr>}
                 </Tbody>
               </Table>
             </CardContent>
           </Card>
         </>
       )}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nuova Liquidazione Socio">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nuovo Credito / Debito Esterno">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div><label className="text-sm font-medium block mb-1">Data</label><Input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} required /></div>
             <div>
-              <label className="text-sm font-medium block mb-1">Socio</label>
-              <Select value={form.socioId} onChange={(e) => setForm({ ...form, socioId: e.target.value })} required>
+              <label className="text-sm font-medium block mb-1">Cliente / Fornitore</label>
+              <Select value={form.clienteId} onChange={(e) => setForm({ ...form, clienteId: e.target.value })} required>
                 <option value="">Seleziona...</option>
-                {soci.map((s) => <option key={s.id} value={s.id}>{s.nome} {s.cognome}</option>)}
+                {clienti.map((c) => <option key={c.id} value={c.id}>{c.nome} {c.cognome || ''}</option>)}
               </Select>
             </div>
           </div>
@@ -204,8 +196,8 @@ export default function LiquidazioniSociPage() {
             <div>
               <label className="text-sm font-medium block mb-1">Tipo movimento</label>
               <Select value={form.tipoMovimento} onChange={(e) => setForm({ ...form, tipoMovimento: e.target.value })}>
-                <option value="credito">Credito (azienda deve pagare)</option>
-                <option value="debito">Debito (socio deve pagare)</option>
+                <option value="credito">Credito (ci devono pagare)</option>
+                <option value="debito">Debito (dobbiamo pagare)</option>
               </Select>
             </div>
             <div><label className="text-sm font-medium block mb-1">Importo (€)</label><Input type="number" step="0.01" min="0" value={form.importo} onChange={(e) => setForm({ ...form, importo: e.target.value })} required /></div>

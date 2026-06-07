@@ -121,6 +121,7 @@ model Aree {
   lavori      LavoroSoci[]
   tariffe     TariffeLavoro[]
   responsabili SociAreeResponsabilita[]
+  raccolte    Raccolta[]
   @@unique([nome, aziendaId])
   @@index([aziendaId])
 }
@@ -327,6 +328,8 @@ model Raccolta {
   unitaMisura String   @default("kg")
   luogoId     Int?
   luogo       Luoghi?  @relation(fields: [luogoId], references: [id])
+  areaId      Int?
+  area        Aree?    @relation(fields: [areaId], references: [id])
   socioId     Int?
   socio       Soci?    @relation(fields: [socioId], references: [id])
   note        String?
@@ -335,6 +338,7 @@ model Raccolta {
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
   @@index([aziendaId])
   @@index([aziendaId, data])
+  @@index([aziendaId, luogoId])
 }
 
 model MovimentiInput {
