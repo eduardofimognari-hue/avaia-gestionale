@@ -1,6 +1,6 @@
 'use client'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, Landmark, ShoppingCart, Euro, Receipt, Hammer, Sprout, Warehouse, MapPin, FileText, Shield, LogOut, X, Menu, BarChart3, Wallet } from 'lucide-react'
+import { LayoutDashboard, Users, Landmark, ShoppingCart, Euro, Receipt, Hammer, Sprout, Warehouse, MapPin, FileText, Shield, LogOut, X, Menu, BarChart3, Wallet, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -36,6 +36,12 @@ const groups: { title: string; items: NavItem[] }[] = [
       { label: 'Terreni', icon: MapPin, href: '/terreni', color: 'text-lime-600' },
       { label: 'Raccolta', icon: Sprout, href: '/raccolta', color: 'text-green-600' },
       { label: 'Magazzino', icon: Warehouse, href: '/magazzino', color: 'text-orange-600' },
+    ],
+  },
+  {
+    title: 'Pianificazione',
+    items: [
+      { label: 'Scenari', icon: TrendingUp, href: '/scenari', color: 'text-indigo-600' },
     ],
   },
   {

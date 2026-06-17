@@ -43,6 +43,7 @@ model Azienda {
   attrezzature          Attrezzature[]
   sistemiIrrigazione    SistemiIrrigazione[]
   portaInnesti          PortaInnesti[]
+  scenari               Scenario[]
 }
 
 model Ruoli {
@@ -152,6 +153,8 @@ model Luoghi {
   apiario     Apiario[]
   terreni     Terreni[]
   movimentiInput MovimentiInput[]
+  scenarioUscite   ScenarioUscita[]
+  scenarioEntrate  ScenarioEntrata[]
   @@index([aziendaId])
 }
 
@@ -187,6 +190,8 @@ model Terreni {
   raccolte              Raccolta[]
   movimenti             MovimentiInput[]
   vendite               Vendite[]
+  scenarioUscite        ScenarioUscita[]
+  scenarioEntrate       ScenarioEntrata[]
   aggiornatoIl          DateTime?     @updatedAt
   @@unique([nome, aziendaId])
   @@index([aziendaId])
@@ -320,6 +325,7 @@ model Prodotti {
   produzioni      ProduzioniInput[]
   righeVendita    RigheVendita[]
   raccolte        Raccolta[]
+  scenarioEntrate ScenarioEntrata[]
   @@unique([codice, aziendaId])
   @@index([aziendaId])
   @@index([aziendaId, attivo])
@@ -674,4 +680,79 @@ model RigheVendita {
   importo     Float
   creatoIl    DateTime @default(now())
   @@index([venditaId])
+}
+
+model Scenario {
+  id           Int                 @id @default(autoincrement())
+  nome         String
+  descrizione  String?
+  annoInizio   Int
+  annoFine     Int
+  stato        String              @default("bozza")
+  creatoIl     DateTime            @default(now())
+  aggiornatoIl DateTime?           @updatedAt
+  aziendaId    Int
+  azienda      Azienda             @relation(fields: [aziendaId], references: [id])
+  uscite       ScenarioUscita[]
+  entrate      ScenarioEntrata[]
+  obiettivi    ScenarioObiettivo[]
+  @@index([aziendaId])
+}
+
+model ScenarioUscita {
+  id          Int       @id @default(autoincrement())
+  scenarioId  Int
+  scenario    Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  anno        Int
+  categoria   String
+  descrizione String
+  importo     Float
+  luogoId     Int?
+  luogo       Luoghi?   @relation(fields: [luogoId], references: [id])
+  terrenoId   Int?
+  terreno     Terreni?  @relation(fields: [terrenoId], references: [id])
+  note        String?
+  creatoIl    DateTime  @default(now())
+  aziendaId   Int
+  @@index([scenarioId])
+  @@index([aziendaId])
+}
+
+model ScenarioEntrata {
+  id              Int       @id @default(autoincrement())
+  scenarioId      Int
+  scenario        Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  anno            Int
+  tipo            String
+  descrizione     String
+  prodottoId      Int?
+  prodotto        Prodotti? @relation(fields: [prodottoId], references: [id])
+  terrenoId       Int?
+  terreno         Terreni?  @relation(fields: [terrenoId], references: [id])
+  luogoId         Int?
+  luogo           Luoghi?   @relation(fields: [luogoId], references: [id])
+  quantitaStimata Float?
+  prezzoStimato   Float?
+  importoFisso    Float?
+  note            String?
+  creatoIl        DateTime  @default(now())
+  aziendaId       Int
+  @@index([scenarioId])
+  @@index([aziendaId])
+}
+
+model ScenarioObiettivo {
+  id           Int      @id @default(autoincrement())
+  scenarioId   Int
+  scenario     Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  nome         String
+  tipo         String   @default("altro")
+  percentuale  Float?
+  importoFisso Float?
+  priorita     Int      @default(1)
+  note         String?
+  creatoIl     DateTime @default(now())
+  aziendaId    Int
+  @@index([scenarioId])
+  @@index([aziendaId])
 }
