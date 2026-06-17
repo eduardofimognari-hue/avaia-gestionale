@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
 import { Plus } from 'lucide-react'
+import { ExportButton } from '@/components/ui/export-button'
 
 type Area = { id: number; nome: string; descrizione: string | null; attivo: boolean }
 
@@ -69,7 +70,7 @@ export default function AreePage() {
 
   return (
     <div>
-      <PageHeader title="Categorie di Lavoro" description="Categorie di lavoro: Agro, Api, Amministrazione, Commerciale, Mista" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Categoria</Button>} />
+      <PageHeader title="Categorie di Lavoro" description="Categorie di lavoro: Agro, Api, Amministrazione, Commerciale, Mista" action={<div className="flex items-center gap-2"><ExportButton risorsa="aree" /><Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Categoria</Button></div>} />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       {loading ? (<p className="text-gray-500">Caricamento...</p>) : (
         <Card>

@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
 import { Plus } from 'lucide-react'
+import { ExportButton } from '@/components/ui/export-button'
 
 type Luogo = {
   id: number
@@ -137,7 +138,7 @@ export default function LuoghiPage() {
 
   return (
     <div>
-      <PageHeader title="Luoghi" description="Luoghi, sedi e centri di costo" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuovo Luogo</Button>} />
+      <PageHeader title="Luoghi" description="Luoghi, sedi e centri di costo" action={<div className="flex items-center gap-2"><ExportButton risorsa="luoghi" /><Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuovo Luogo</Button></div>} />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
       {/* Filtri */}

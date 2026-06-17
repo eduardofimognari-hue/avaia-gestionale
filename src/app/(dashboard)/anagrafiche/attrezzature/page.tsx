@@ -10,6 +10,7 @@ import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
 import { Plus } from 'lucide-react'
 import { formatEuro } from '@/lib/utils'
+import { ExportButton } from '@/components/ui/export-button'
 
 type Fornitore = { id: number; nome: string; cognome: string | null; ragioneSociale: string | null }
 type Attrezzatura = {
@@ -102,7 +103,7 @@ export default function AttrezzaturePage() {
   return (
     <div>
       <PageHeader title="Attrezzature" description="Gestione attrezzature, macchinari e materiali di consumo"
-        action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Attrezzatura</Button>} />
+        action={<div className="flex items-center gap-2"><ExportButton risorsa="attrezzature" /><Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Attrezzatura</Button></div>} />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       {loading ? (<p className="text-gray-500">Caricamento...</p>) : (
         <Card>

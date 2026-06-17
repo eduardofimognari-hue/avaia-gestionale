@@ -9,6 +9,13 @@ import { getLiquidazioniExport, LIQUIDAZIONI_COLUMNS } from '@/lib/export/querie
 import { getContabilitaExport, CONTABILITA_COLUMNS } from '@/lib/export/queries/contabilita'
 import { getSociExport, SOCI_COLUMNS } from '@/lib/export/queries/soci'
 import { getDocumentiExport, DOCUMENTI_COLUMNS } from '@/lib/export/queries/documenti'
+import { getClientiExport, CLIENTI_COLUMNS } from '@/lib/export/queries/clienti'
+import { getProdottiExport, PRODOTTI_COLUMNS } from '@/lib/export/queries/prodotti'
+import { getAttrezzatureExport, ATTREZZATURE_COLUMNS } from '@/lib/export/queries/attrezzature'
+import { getLuoghiExport, LUOGHI_COLUMNS } from '@/lib/export/queries/luoghi'
+import { getAreeExport, AREE_COLUMNS } from '@/lib/export/queries/aree'
+import { getSistemiIrrigazioneExport, SISTEMI_IRRIGAZIONE_COLUMNS } from '@/lib/export/queries/sistemi_irrigazione'
+import { getPortaInnestiExport, PORTA_INNESTI_COLUMNS } from '@/lib/export/queries/porta_innesti'
 
 type ExportFormat = 'csv' | 'json'
 
@@ -21,6 +28,13 @@ const RISORSE = {
   contabilita: { fn: getContabilitaExport, columns: CONTABILITA_COLUMNS, hasDateFilter: true },
   soci: { fn: (aziendaId: number) => getSociExport(aziendaId), columns: SOCI_COLUMNS, hasDateFilter: false },
   documenti: { fn: getDocumentiExport, columns: DOCUMENTI_COLUMNS, hasDateFilter: true },
+  clienti: { fn: (aziendaId: number) => getClientiExport(aziendaId), columns: CLIENTI_COLUMNS, hasDateFilter: false },
+  prodotti: { fn: (aziendaId: number) => getProdottiExport(aziendaId), columns: PRODOTTI_COLUMNS, hasDateFilter: false },
+  attrezzature: { fn: (aziendaId: number) => getAttrezzatureExport(aziendaId), columns: ATTREZZATURE_COLUMNS, hasDateFilter: false },
+  luoghi: { fn: (aziendaId: number) => getLuoghiExport(aziendaId), columns: LUOGHI_COLUMNS, hasDateFilter: false },
+  aree: { fn: (aziendaId: number) => getAreeExport(aziendaId), columns: AREE_COLUMNS, hasDateFilter: false },
+  'sistemi-irrigazione': { fn: (aziendaId: number) => getSistemiIrrigazioneExport(aziendaId), columns: SISTEMI_IRRIGAZIONE_COLUMNS, hasDateFilter: false },
+  'porta-innesti': { fn: (aziendaId: number) => getPortaInnestiExport(aziendaId), columns: PORTA_INNESTI_COLUMNS, hasDateFilter: false },
 } as const
 
 type RisorsaKey = keyof typeof RISORSE

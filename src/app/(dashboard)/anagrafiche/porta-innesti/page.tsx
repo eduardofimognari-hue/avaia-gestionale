@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
 import { Plus, Pencil, Trash2, TreePine } from 'lucide-react'
+import { ExportButton } from '@/components/ui/export-button'
 
 type PortaInnesto = { id: number; nome: string }
 
@@ -71,7 +72,7 @@ export default function PortaInnestiPage() {
       <PageHeader
         title="Porta Innesti"
         description="Gestisci i porta innesti associabili agli stacchi produttivi"
-        action={<Button onClick={openNew}><Plus className="w-4 h-4 mr-2" />Nuovo Porta Innesto</Button>}
+        action={<div className="flex items-center gap-2"><ExportButton risorsa="porta-innesti" /><Button onClick={openNew}><Plus className="w-4 h-4 mr-2" />Nuovo Porta Innesto</Button></div>}
       />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
