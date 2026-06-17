@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
 import { Plus } from 'lucide-react'
+import { ExportButton } from '@/components/ui/export-button'
 import { formatDate, formatNumber } from '@/lib/utils'
 
 type Prodotto = { id: number; nome: string; varietaTipologia: string | null; tipo: string; unitaMisura: string }
@@ -96,7 +97,16 @@ export default function MagazzinoPage() {
 
   return (
     <div>
-      <PageHeader title="Magazzino" description="Giacenze e movimenti" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuovo Movimento</Button>} />
+      <PageHeader
+        title="Magazzino"
+        description="Giacenze e movimenti"
+        action={
+          <div className="flex items-center gap-2">
+            <ExportButton risorsa="magazzino" />
+            <Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuovo Movimento</Button>
+          </div>
+        }
+      />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
       <div className="flex gap-2 mb-4">

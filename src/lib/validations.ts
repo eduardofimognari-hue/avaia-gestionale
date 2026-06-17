@@ -1,4 +1,12 @@
 import { z } from 'zod'
+import {
+  TIPO_MOVIMENTO_INPUT,
+  TIPO_MOVIMENTO_CASSA,
+  TIPO_MOVIMENTO_CASSA_DETTAGLIO,
+  STATO_MOVIMENTO_CASSA,
+  TIPO_MOVIMENTO_SOCI,
+  TIPO_DOCUMENTO,
+} from './constants'
 
 export const sociSchema = z.object({
   nome: z.string().min(1, 'Nome obbligatorio'),
@@ -71,7 +79,7 @@ export const listinoSchema = z.object({
 export const magazzinoMovimentoSchema = z.object({
   data: z.string().min(1, 'Data obbligatoria'),
   prodottoId: z.number({ required_error: 'Prodotto obbligatorio' }),
-  tipo: z.enum(['carico', 'scarico', 'vendita', 'reso'], { required_error: 'Tipo non valido' }),
+  tipo: z.enum(TIPO_MOVIMENTO_INPUT, { required_error: 'Tipo non valido' }),
   quantita: z.number().positive('Quantità deve essere positiva'),
   unitaMisura: z.string().min(1, 'Unità misura obbligatoria'),
   luogoId: z.number().optional().nullable(),
@@ -90,26 +98,21 @@ export const cassaMovimentoSchema = z.object({
   data: z.string().optional(),
   luogoId: z.number().optional().nullable(),
   socioId: z.number().optional().nullable(),
-  tipo: z.enum(['entrata', 'uscita'], { required_error: 'Tipo non valido' }),
-  tipoMovimento: z.enum([
-    'entrata_generica', 'anticipo_socio', 'rimborso_azienda', 'incasso_cliente',
-    'rimborso_fornitore', 'liquidazione_credito',
-    'spesa', 'anticipo_azienda', 'rimborso_socio', 'stipendio', 'fornitore',
-    'acquisto', 'liquidazione', 'altro',
-  ], { required_error: 'Tipo movimento non valido' }).optional().default('altro'),
+  tipo: z.enum(TIPO_MOVIMENTO_CASSA, { required_error: 'Tipo non valido' }),
+  tipoMovimento: z.enum(TIPO_MOVIMENTO_CASSA_DETTAGLIO, { required_error: 'Tipo movimento non valido' }).optional().default('altro'),
   importo: z.number().positive('Importo deve essere positivo'),
   categoria: z.string().optional().nullable(),
   descrizione: z.string().optional().nullable(),
   riferimento: z.string().optional().nullable(),
   riferimentoId: z.number().optional().nullable(),
   riferimentoTipo: z.string().optional().nullable(),
-  stato: z.enum(['pagato', 'da_pagare', 'da_riscuotere', 'riscosso']).optional().default('pagato'),
+  stato: z.enum(STATO_MOVIMENTO_CASSA).optional().default('pagato'),
 })
 
 export const movimentiSociSchema = z.object({
   data: z.string().optional(),
   socioId: z.number({ required_error: 'Socio obbligatorio' }),
-  tipo: z.enum(['credito', 'debito'], { required_error: 'Tipo non valido' }),
+  tipo: z.enum(TIPO_MOVIMENTO_SOCI, { required_error: 'Tipo non valido' }),
   importo: z.number({ required_error: 'Importo obbligatorio' }).positive('Importo deve essere positivo'),
   categoria: z.string().optional().nullable(),
   descrizione: z.string().optional().nullable(),
@@ -118,7 +121,7 @@ export const movimentiSociSchema = z.object({
 export const liquidazioniSociSchema = z.object({
   data: z.string().optional(),
   socioId: z.number({ required_error: 'Socio obbligatorio' }),
-  tipo: z.enum(['credito', 'debito'], { required_error: 'Tipo non valido' }),
+  tipo: z.enum(TIPO_MOVIMENTO_SOCI, { required_error: 'Tipo non valido' }),
   importo: z.number({ required_error: 'Importo obbligatorio' }).positive('Importo deve essere positivo'),
   note: z.string().optional().nullable(),
 })
@@ -173,7 +176,7 @@ export const raccoltaSchema = z.object({
 })
 
 export const documentoGeneratoSchema = z.object({
-  tipo: z.enum(['ddt', 'fattura'], { required_error: 'Tipo documento obbligatorio' }),
+  tipo: z.nativeEnum(TIPO_DOCUMENTO, { required_error: 'Tipo documento obbligatorio' }),
   venditaId: z.number({ required_error: 'Vendita obbligatoria' }),
   data: z.string().optional(),
   note: z.string().optional().nullable(),
@@ -184,4 +187,69 @@ export const utenteSchema = z.object({
   nome: z.string().min(1, 'Nome obbligatorio'),
   password: z.string().min(6, 'Password almeno 6 caratteri'),
   ruolo: z.string().optional().default('editor'),
+})
+
+// ─── Schema PATCH (aggiornamento parziale) ───────────────────────────────────
+// Permettono solo i campi modificabili, bloccando id, aziendaId, creatoIl, codice.
+
+export const prodottiPatchSchema = z.object({
+  nome: z.string().min(1).optional(),
+  varietaTipologia: z.string().nullable().optional(),
+  categoria: z.string().nullable().optional(),
+  tipo: z.string().optional(),
+  unitaMisura: z.string().optional(),
+  aliquotaIva: z.number().optional(),
+  attivo: z.boolean().optional(),
+  note: z.string().nullable().optional(),
+})
+
+export const clientiPatchSchema = z.object({
+  nome: z.string().min(1).optional(),
+  cognome: z.string().nullable().optional(),
+  ragioneSociale: z.string().nullable().optional(),
+  tipo: z.string().optional(),
+  codiceFiscale: z.string().nullable().optional(),
+  partitaIva: z.string().nullable().optional(),
+  telefono: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional().or(z.literal('')),
+  indirizzo: z.string().nullable().optional(),
+  comune: z.string().nullable().optional(),
+  provincia: z.string().nullable().optional(),
+  cap: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  attivo: z.boolean().optional(),
+})
+
+export const sociPatchSchema = z.object({
+  nome: z.string().min(1).optional(),
+  cognome: z.string().min(1).optional(),
+  codiceFiscale: z.string().nullable().optional(),
+  telefono: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional().or(z.literal('')),
+  indirizzo: z.string().nullable().optional(),
+  dataIngresso: z.string().nullable().optional(),
+  dataUscita: z.string().nullable().optional(),
+  attivo: z.boolean().optional(),
+  note: z.string().nullable().optional(),
+  responsabilita: z.array(z.number()).optional(),
+  ruoli: z.array(z.number()).optional(),
+})
+
+export const attrezzaturePatchSchema = z.object({
+  nome: z.string().min(1).optional(),
+  categoria: z.string().nullable().optional(),
+  fornitoreId: z.number().nullable().optional(),
+  costoUnitario: z.number().nullable().optional(),
+  unitaMisura: z.string().optional(),
+  scortaMinima: z.number().nullable().optional(),
+  quantita: z.number().optional(),
+  note: z.string().nullable().optional(),
+  attivo: z.boolean().optional(),
+})
+
+export const venditePatchSchema = z.object({
+  pagata: z.boolean().optional(),
+  statoPagamento: z.string().optional(),
+  metodoPagamento: z.string().nullable().optional(),
+  dataPagamentoPrevista: z.string().nullable().optional(),
 })

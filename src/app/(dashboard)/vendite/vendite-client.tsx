@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select'
 import { formatDate, formatEuro, formatNumber } from '@/lib/utils'
 import Link from 'next/link'
 import { Plus, FileText, Receipt, Pencil } from 'lucide-react'
+import { ExportButton } from '@/components/ui/export-button'
 
 type Vendita = {
   id: number; data: string; tipoCliente: string; importoTotale: number | null
@@ -56,7 +57,16 @@ export function VenditeClient({ initialData }: { initialData: Vendita[] }) {
 
   return (
     <div>
-      <PageHeader title="Vendite" description="Registro vendite" action={<Link href="/vendite/nuova"><Button><Plus className="w-4 h-4 mr-2" />Nuova Vendita</Button></Link>} />
+      <PageHeader
+        title="Vendite"
+        description="Registro vendite"
+        action={
+          <div className="flex items-center gap-2">
+            <ExportButton risorsa="vendite" />
+            <Link href="/vendite/nuova"><Button><Plus className="w-4 h-4 mr-2" />Nuova Vendita</Button></Link>
+          </div>
+        }
+      />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       <Card>
         <CardContent className="p-0">

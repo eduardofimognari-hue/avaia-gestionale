@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db'
 import { getCurrentAziendaId } from '@/lib/azienda-context'
-import { getGiacenzeAggregate, type GiacenzaAggregata } from '@/lib/api-utils'
+import { getGiacenzeAggregate, type GiacenzaAggregata } from '@/lib/services/magazzino'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Euro, Package, Users, AlertTriangle, ShoppingCart, TrendingUp, TrendingDown, PackageOpen, Receipt, CalendarClock } from 'lucide-react'

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
 import { Plus, Sprout, MapPin, User } from 'lucide-react'
+import { ExportButton } from '@/components/ui/export-button'
 import { formatDate, formatNumber } from '@/lib/utils'
 
 type Raccolta = {
@@ -112,7 +113,16 @@ export default function RaccoltaPage() {
 
   return (
     <div>
-      <PageHeader title="Raccolta" description="Registrazione raccolte prodotti freschi" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Raccolta</Button>} />
+      <PageHeader
+        title="Raccolta"
+        description="Registrazione raccolte prodotti freschi"
+        action={
+          <div className="flex items-center gap-2">
+            <ExportButton risorsa="raccolta" />
+            <Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Raccolta</Button>
+          </div>
+        }
+      />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
       {loading ? (

@@ -13,6 +13,7 @@ import {
   ShoppingCart, Undo2, UserCheck, RotateCcw, Receipt, Circle, Briefcase, Truck, Package, UserPlus, UserMinus, ArrowDownToLine, Wallet, Pencil,
 } from 'lucide-react'
 import { formatDate, formatEuro } from '@/lib/utils'
+import { ExportButton } from '@/components/ui/export-button'
 
 type Cassa = { id: number; nome: string; saldoIniziale: number; movimenti: { tipo: string; importo: number; luogoId: number | null }[] }
 type Luogo = { id: number; nome: string; tipologia: string }
@@ -159,7 +160,16 @@ export function ContabilitaClient({
 
   return (
     <div>
-      <PageHeader title="Movimenti" description="Cassa, sottocontabilità e posizioni finanziarie" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuovo Movimento</Button>} />
+      <PageHeader
+        title="Movimenti"
+        description="Cassa, sottocontabilità e posizioni finanziarie"
+        action={
+          <div className="flex items-center gap-2">
+            <ExportButton risorsa="contabilita" />
+            <Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuovo Movimento</Button>
+          </div>
+        }
+      />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
       <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3"><Landmark className="w-4 h-4 inline mr-1" /> Conto Principale</h3>

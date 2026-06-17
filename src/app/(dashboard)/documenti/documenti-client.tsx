@@ -8,6 +8,7 @@ import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
 import { Plus, FileText, FileSpreadsheet, Eye, CheckCircle } from 'lucide-react'
 import { formatDate, formatEuro } from '@/lib/utils'
+import { ExportButton } from '@/components/ui/export-button'
 import Link from 'next/link'
 
 type Documento = {
@@ -94,7 +95,16 @@ export function DocumentiClient({ initialDocumenti, vendite }: Props) {
 
   return (
     <div>
-      <PageHeader title="DDT e Fatture" description="Gestione documenti di trasporto e fatture" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Genera Documento</Button>} />
+      <PageHeader
+        title="DDT e Fatture"
+        description="Gestione documenti di trasporto e fatture"
+        action={
+          <div className="flex items-center gap-2">
+            <ExportButton risorsa="documenti" />
+            <Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Genera Documento</Button>
+          </div>
+        }
+      />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">

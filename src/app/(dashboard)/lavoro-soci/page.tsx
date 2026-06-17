@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
 import { Plus } from 'lucide-react'
+import { ExportButton } from '@/components/ui/export-button'
 import { formatDate, formatNumber, formatEuro } from '@/lib/utils'
 
 type Lavoro = {
@@ -81,7 +82,16 @@ export default function LavoroSociPage() {
 
   return (
     <div>
-      <PageHeader title="Lavoro Soci" description="Registrazione ore lavoro per luogo e area" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Registrazione</Button>} />
+      <PageHeader
+        title="Lavoro Soci"
+        description="Registrazione ore lavoro per luogo e area"
+        action={
+          <div className="flex items-center gap-2">
+            <ExportButton risorsa="lavoro" />
+            <Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Registrazione</Button>
+          </div>
+        }
+      />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       {loading ? (<p className="text-gray-500">Caricamento...</p>) : (
         <Card>

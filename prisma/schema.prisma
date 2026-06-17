@@ -98,6 +98,7 @@ model Soci {
   attivo         Boolean          @default(true)
   note           String?
   creatoIl       DateTime         @default(now())
+  aggiornatoIl   DateTime?        @updatedAt
   aziendaId      Int
   azienda        Azienda          @relation(fields: [aziendaId], references: [id])
   lavori         LavoroSoci[]
@@ -186,6 +187,7 @@ model Terreni {
   raccolte              Raccolta[]
   movimenti             MovimentiInput[]
   vendite               Vendite[]
+  aggiornatoIl          DateTime?     @updatedAt
   @@unique([nome, aziendaId])
   @@index([aziendaId])
   @@index([aziendaId, luogoId])
@@ -265,6 +267,7 @@ model Attrezzature {
   aziendaId     Int
   azienda       Azienda   @relation(fields: [aziendaId], references: [id])
   creatoIl      DateTime  @default(now())
+  aggiornatoIl  DateTime? @updatedAt
   @@unique([nome, aziendaId])
   @@index([aziendaId])
 }
@@ -286,6 +289,7 @@ model Clienti {
   note          String?
   attivo        Boolean     @default(true)
   creatoIl      DateTime    @default(now())
+  aggiornatoIl  DateTime?   @updatedAt
   aziendaId     Int
   azienda       Azienda     @relation(fields: [aziendaId], references: [id])
   debiti        DebitiAperti[]
@@ -298,7 +302,7 @@ model Clienti {
 
 model Prodotti {
   id              Int            @id @default(autoincrement())
-  codice          String         @unique
+  codice          String
   nome            String
   varietaTipologia String?
   categoria       String?
@@ -308,6 +312,7 @@ model Prodotti {
   attivo          Boolean        @default(true)
   note            String?
   creatoIl        DateTime       @default(now())
+  aggiornatoIl    DateTime?      @updatedAt
   aziendaId       Int
   azienda         Azienda        @relation(fields: [aziendaId], references: [id])
   listino         ListinoPrezzi[]
@@ -315,6 +320,7 @@ model Prodotti {
   produzioni      ProduzioniInput[]
   righeVendita    RigheVendita[]
   raccolte        Raccolta[]
+  @@unique([codice, aziendaId])
   @@index([aziendaId])
   @@index([aziendaId, attivo])
 }
@@ -412,6 +418,7 @@ model LavoroSoci {
   descrizione String?
   liquidato   Boolean  @default(false)
   creatoIl    DateTime @default(now())
+  aggiornatoIl DateTime? @updatedAt
   aziendaId   Int
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
   @@index([aziendaId])
@@ -531,6 +538,7 @@ model LiquidazioniSoci {
   dataPagamento DateTime?
   note          String?
   creatoIl      DateTime @default(now())
+  aggiornatoIl  DateTime? @updatedAt
   aziendaId     Int
   azienda       Azienda  @relation(fields: [aziendaId], references: [id])
   movimenti     MovimentiSoci[]
@@ -556,7 +564,8 @@ model DebitiAperti {
   vendita     Vendite?  @relation(fields: [venditaId], references: [id])
   tipo        String    @default("cliente")
   note        String?
-  creatoIl    DateTime   @default(now())
+  creatoIl    DateTime  @default(now())
+  aggiornatoIl DateTime? @updatedAt
   aziendaId   Int
   azienda     Azienda   @relation(fields: [aziendaId], references: [id])
   @@index([aziendaId])
@@ -599,6 +608,7 @@ model Vendite {
   dataPagamentoPrevista DateTime?
   statoPagamento String @default("da_pagare")
   creatoIl    DateTime @default(now())
+  aggiornatoIl DateTime? @updatedAt
   aziendaId   Int
   azienda     Azienda  @relation(fields: [aziendaId], references: [id])
   righe       RigheVendita[]
@@ -626,6 +636,7 @@ model Documenti {
   metodoPagamento String?
   note          String?
   creatoIl      DateTime @default(now())
+  aggiornatoIl  DateTime? @updatedAt
   aziendaId     Int
   azienda       Azienda  @relation(fields: [aziendaId], references: [id])
   @@unique([tipo, numero, anno, aziendaId])

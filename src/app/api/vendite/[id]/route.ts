@@ -1,31 +1,31 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { withAzienda, withRuoloScrittura } from '@/lib/api-utils'
+import { withValidazione, withRuoloScrittura } from '@/lib/api-utils'
+import { venditePatchSchema } from '@/lib/validations'
+import { STATO_DEBITO, TIPO_MOVIMENTO_CASSA } from '@/lib/constants'
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const id = parseInt(params.id)
   if (!id) return NextResponse.json({ error: 'ID non valido' }, { status: 400 })
-  return withAzienda(async (aziendaId) => {
+  return withValidazione(request, venditePatchSchema, async (parsed, aziendaId) => {
     const ruolo = await withRuoloScrittura(aziendaId)
     if (!ruolo.allowed) return ruolo.response!
-    const body = await request.json()
     const vendita = await prisma.vendite.findFirst({ where: { id, aziendaId } })
     if (!vendita) return NextResponse.json({ error: 'Vendita non trovata' }, { status: 404 })
 
     const wasPagata = vendita.pagata
-    const isPagata = body.pagata === true
+    const isPagata = parsed.pagata === true
 
     const updated = await prisma.vendite.update({
       where: { id },
       data: {
-        pagata: body.pagata ?? undefined,
-        statoPagamento: body.statoPagamento ?? undefined,
-        metodoPagamento: body.metodoPagamento ?? undefined,
-        dataPagamentoPrevista: body.dataPagamentoPrevista ? new Date(body.dataPagamentoPrevista) : undefined,
+        pagata: parsed.pagata ?? undefined,
+        statoPagamento: parsed.statoPagamento ?? undefined,
+        metodoPagamento: parsed.metodoPagamento ?? undefined,
+        dataPagamentoPrevista: parsed.dataPagamentoPrevista ? new Date(parsed.dataPagamentoPrevista) : undefined,
       },
     })
 
-    // If newly marked as paid, create movimento in contabilità
     if (isPagata && !wasPagata) {
       const primaCassa = await prisma.casseInterne.findFirst({ where: { aziendaId }, orderBy: { id: 'asc' } })
       if (primaCassa) {
@@ -48,7 +48,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         // Close open debit
         await prisma.debitiAperti.updateMany({
           where: { venditaId: id, stato: 'aperto' },
-          data: { stato: 'chiuso', dataSaldo: new Date() },
+          data: { stato: STATO_DEBITO.CHIUSO, dataSaldo: new Date() },
         })
       }
     }

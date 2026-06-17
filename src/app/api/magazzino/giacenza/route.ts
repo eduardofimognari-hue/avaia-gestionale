@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withAzienda, getGiacenzaSingola } from '@/lib/api-utils'
+import { withAzienda } from '@/lib/api-utils'
+import { getGiacenzaSingola } from '@/lib/services/magazzino'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
+import { ExportButton } from '@/components/ui/export-button'
 import { Plus, ArrowUpCircle, ArrowDownCircle, CheckCircle, Users } from 'lucide-react'
 import { formatDate, formatEuro } from '@/lib/utils'
 
@@ -94,7 +95,16 @@ export default function LiquidazioniSociPage() {
 
   return (
     <div>
-      <PageHeader title="Liquidazioni Soci" description="Gestione crediti e debiti interni con i soci" action={<Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Liquidazione</Button>} />
+      <PageHeader
+        title="Liquidazioni Soci"
+        description="Gestione crediti e debiti interni con i soci"
+        action={
+          <div className="flex items-center gap-2">
+            <ExportButton risorsa="liquidazioni" />
+            <Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Nuova Liquidazione</Button>
+          </div>
+        }
+      />
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       {loading ? (<p className="text-gray-500">Caricamento...</p>) : (
         <>
