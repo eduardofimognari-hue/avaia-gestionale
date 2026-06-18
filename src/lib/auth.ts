@@ -51,6 +51,12 @@ export const authOptions: NextAuthOptions = {
       session.ruolo = token.ruolo
       return session
     },
+    async redirect({ url, baseUrl }) {
+      // Dopo il login, non tornare sull'assistente AI — vai alla dashboard
+      if (url === `${baseUrl}/assistente`) return `${baseUrl}/dashboard`
+      if (url.startsWith(baseUrl)) return url
+      return `${baseUrl}/dashboard`
+    },
   },
 }
 

@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { withAzienda } from '@/lib/api-utils'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const SYSTEM_PROMPT = `Sei l'assistente intelligente del gestionale agricolo Avaia.
 Hai accesso completo ai dati reali dell'azienda e rispondi SEMPRE in italiano.
@@ -307,31 +306,43 @@ export async function POST(req: Request) {
 
     const contesto = await buildContesto(aziendaId)
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: SYSTEM_PROMPT,
-    })
+    const contents = [
+      { role: 'user', parts: [{ text: `Ecco i dati aggiornati del gestionale:\n\n${contesto}` }] },
+      { role: 'model', parts: [{ text: 'Ho ricevuto e analizzato tutti i dati del gestionale. Sono pronto a rispondere alle tue domande.' }] },
+      ...cronologia.map(m => ({ role: m.ruolo, parts: [{ text: m.testo }] })),
+      { role: 'user', parts: [{ text: domanda }] },
+    ]
 
-    const chat = model.startChat({
-      history: [
-        {
-          role: 'user',
-          parts: [{ text: `Ecco i dati aggiornati del gestionale:\n\n${contesto}` }],
-        },
-        {
-          role: 'model',
-          parts: [{ text: 'Ho ricevuto e analizzato tutti i dati del gestionale. Sono pronto a rispondere alle tue domande.' }],
-        },
-        ...cronologia.map(m => ({
-          role: m.ruolo as 'user' | 'model',
-          parts: [{ text: m.testo }],
-        })),
-      ],
-    })
+    const apiKey = process.env.GEMINI_API_KEY
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents,
+          generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+        }),
+      }
+    )
 
-    const result = await chat.sendMessage(domanda)
-    const risposta = result.response.text()
+    if (!geminiRes.ok) {
+      const errBody = await geminiRes.json().catch(() => ({}))
+      const errMsg = (errBody as { error?: { message?: string } })?.error?.message ?? `HTTP ${geminiRes.status}`
+      console.error('Gemini API error:', geminiRes.status, errMsg)
+      return NextResponse.json({ error: `Errore AI (${geminiRes.status}): ${errMsg}` }, { status: 503 })
+    }
+
+    const geminiData = await geminiRes.json() as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[]
+    }
+    const risposta = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+
+    if (!risposta) {
+      console.error('Gemini: risposta vuota', JSON.stringify(geminiData))
+      return NextResponse.json({ error: 'L\'AI non ha restituito una risposta. Riprova.' }, { status: 503 })
+    }
 
     return NextResponse.json({ risposta })
   })
