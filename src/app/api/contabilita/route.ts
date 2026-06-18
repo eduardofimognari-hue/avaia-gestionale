@@ -106,6 +106,7 @@ export async function POST(request: Request) {
         descrizione: parsed.descrizione ?? null,
         riferimento: parsed.riferimento ?? null, riferimentoId: parsed.riferimentoId ?? null,
         riferimentoTipo: parsed.riferimentoTipo ?? null, stato: parsed.stato ?? 'pagato',
+        ricorrente: parsed.ricorrente ?? false,
       },
       include: {
         cassa: { select: { nome: true } },

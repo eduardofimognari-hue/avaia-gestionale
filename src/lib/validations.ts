@@ -107,6 +107,7 @@ export const cassaMovimentoSchema = z.object({
   riferimentoId: z.number().optional().nullable(),
   riferimentoTipo: z.string().optional().nullable(),
   stato: z.enum(STATO_MOVIMENTO_CASSA).optional().default('pagato'),
+  ricorrente: z.boolean().optional().default(false),
 })
 
 export const movimentiSociSchema = z.object({

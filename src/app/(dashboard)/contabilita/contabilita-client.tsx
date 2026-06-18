@@ -10,7 +10,7 @@ import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
 import {
   Plus, Landmark, MapPin, User, Building2, ArrowUpCircle, ArrowDownCircle,
-  ShoppingCart, Undo2, UserCheck, RotateCcw, Receipt, Circle, Briefcase, Truck, Package, UserPlus, UserMinus, ArrowDownToLine, Wallet, Pencil,
+  ShoppingCart, Undo2, UserCheck, RotateCcw, Receipt, Circle, Briefcase, Truck, Package, UserPlus, UserMinus, ArrowDownToLine, Wallet, Pencil, Repeat2,
 } from 'lucide-react'
 import { formatDate, formatEuro } from '@/lib/utils'
 import { ExportButton } from '@/components/ui/export-button'
@@ -26,6 +26,7 @@ type Movimento = {
   socio: { id: number; nome: string; cognome: string } | null
   tipo: string; tipoMovimento: string; importo: number
   categoria: string | null; descrizione: string | null; stato: string | null
+  ricorrente: boolean
 }
 
 const TIPI_MOVIMENTO: Record<string, { label: string; color: string; icon: any; direzione: 'entrata' | 'uscita' }> = {
@@ -79,7 +80,7 @@ export function ContabilitaClient({
   const [error, setError] = useState('')
   const [filtroLuogo, setFiltroLuogo] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
-  const [form, setForm] = useState({ tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: '', luogoId: '', socioId: '', categoria: '', descrizione: '', riferimento: '', riferimentoId: '', riferimentoTipo: '', stato: 'pagato' })
+  const [form, setForm] = useState({ tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: '', luogoId: '', socioId: '', categoria: '', descrizione: '', riferimento: '', riferimentoId: '', riferimentoTipo: '', stato: 'pagato', ricorrente: false })
 
   function calcSaldo(c: Cassa) {
     return c.movimenti.reduce((acc, m) => m.tipo === 'entrata' ? acc + m.importo : acc - m.importo, c.saldoIniziale)
@@ -115,7 +116,7 @@ export function ContabilitaClient({
 
   function openEditMovimento(m: Movimento) {
     setEditMovimento(m)
-    setForm({ tipo: m.tipo, tipoMovimento: m.tipoMovimento, importo: m.importo.toString(), luogoId: m.luogo?.id?.toString() || '', socioId: m.socio?.id?.toString() || '', categoria: m.categoria || '', descrizione: m.descrizione || '', riferimento: '', riferimentoId: '', riferimentoTipo: '', stato: m.stato || 'pagato' })
+    setForm({ tipo: m.tipo, tipoMovimento: m.tipoMovimento, importo: m.importo.toString(), luogoId: m.luogo?.id?.toString() || '', socioId: m.socio?.id?.toString() || '', categoria: m.categoria || '', descrizione: m.descrizione || '', riferimento: '', riferimentoId: '', riferimentoTipo: '', stato: m.stato || 'pagato', ricorrente: m.ricorrente })
     setEditModalOpen(true)
   }
 
@@ -132,7 +133,7 @@ export function ContabilitaClient({
     if (!editMovimento) return
     setSaving(true)
     try {
-      const body: any = { tipo: form.tipo, tipoMovimento: form.tipoMovimento, importo: parseFloat(form.importo), luogoId: form.luogoId ? parseInt(form.luogoId) : null, socioId: form.socioId ? parseInt(form.socioId) : null, categoria: form.categoria || null, descrizione: form.descrizione || null, stato: form.stato || 'pagato' }
+      const body: any = { tipo: form.tipo, tipoMovimento: form.tipoMovimento, importo: parseFloat(form.importo), luogoId: form.luogoId ? parseInt(form.luogoId) : null, socioId: form.socioId ? parseInt(form.socioId) : null, categoria: form.categoria || null, descrizione: form.descrizione || null, stato: form.stato || 'pagato', ricorrente: form.ricorrente }
       const res = await fetch(`/api/contabilita/${editMovimento.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) throw new Error()
       setEditModalOpen(false)
@@ -146,13 +147,13 @@ export function ContabilitaClient({
     e.preventDefault()
     setSaving(true)
     try {
-      const body: any = { tipo: form.tipo, tipoMovimento: form.tipoMovimento, importo: parseFloat(form.importo), luogoId: form.luogoId ? parseInt(form.luogoId) : null, socioId: form.socioId ? parseInt(form.socioId) : null, categoria: form.categoria || null, descrizione: form.descrizione || null, stato: form.stato || 'pagato' }
+      const body: any = { tipo: form.tipo, tipoMovimento: form.tipoMovimento, importo: parseFloat(form.importo), luogoId: form.luogoId ? parseInt(form.luogoId) : null, socioId: form.socioId ? parseInt(form.socioId) : null, categoria: form.categoria || null, descrizione: form.descrizione || null, stato: form.stato || 'pagato', ricorrente: form.ricorrente }
       if (form.riferimentoId) { body.riferimentoId = parseInt(form.riferimentoId); body.riferimentoTipo = form.riferimentoTipo || null }
       else if (form.riferimento) { body.riferimento = form.riferimento }
       const res = await fetch('/api/contabilita', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) throw new Error()
       setModalOpen(false)
-      setForm({ tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: '', luogoId: '', socioId: '', categoria: '', descrizione: '', riferimento: '', riferimentoId: '', riferimentoTipo: '', stato: 'pagato' })
+      setForm({ tipo: 'entrata', tipoMovimento: 'entrata_generica', importo: '', luogoId: '', socioId: '', categoria: '', descrizione: '', riferimento: '', riferimentoId: '', riferimentoTipo: '', stato: 'pagato', ricorrente: false })
       await refreshMovimenti()
     } catch { setError('Errore durante il salvataggio') }
     finally { setSaving(false) }
@@ -264,7 +265,7 @@ export function ContabilitaClient({
         <CardContent className="p-0">
           <Table>
             <Thead>
-              <Tr><Th>Data</Th><Th>Conto</Th><Th>Entrata/Uscita</Th><Th>Tipo</Th><Th>Luogo</Th><Th>Socio</Th><Th>Importo</Th><Th>Stato</Th><Th></Th></Tr>
+              <Tr><Th>Data</Th><Th>Conto</Th><Th>Entrata/Uscita</Th><Th>Tipo</Th><Th>Luogo</Th><Th>Socio</Th><Th>Importo</Th><Th>Stato</Th><Th></Th><Th></Th></Tr>
             </Thead>
             <Tbody>
               {movimentiFiltrati.map((m) => {
@@ -279,6 +280,7 @@ export function ContabilitaClient({
                     <Td>{m.socio ? `${m.socio.nome} ${m.socio.cognome}` : '-'}</Td>
                     <Td className="font-medium">{formatEuro(m.importo)}</Td>
                     <Td><Badge variant={statoInfo.variant}>{statoInfo.label}</Badge></Td>
+                    <Td>{m.ricorrente && <span title="Ricorrente"><Repeat2 className="w-4 h-4 text-indigo-500" /></span>}</Td>
                     <Td><Pencil className="w-4 h-4 text-gray-400 hover:text-gray-600" /></Td>
                   </Tr>
                 )
@@ -332,6 +334,12 @@ export function ContabilitaClient({
               <div><label className="text-sm font-medium block mb-1">Categoria</label><Select value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}><option value="">Seleziona...</option><option value="Vendite">Vendite</option><option value="Spese">Spese</option><option value="Stipendi">Stipendi</option><option value="Fornitori">Fornitori</option><option value="Manutenzione">Manutenzione</option><option value="Materiali">Materiali</option><option value="Viaggio">Viaggio</option><option value="Utenze">Utenze</option><option value="Altro">Altro</option></Select></div>
               <div><label className="text-sm font-medium block mb-1">Descrizione</label><Input value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} /></div>
             </div>
+            <label className="flex items-center gap-2 cursor-pointer select-none text-sm">
+              <input type="checkbox" checked={form.ricorrente} onChange={e => setForm({ ...form, ricorrente: e.target.checked })} className="w-4 h-4 rounded accent-indigo-600" />
+              <Repeat2 className="w-4 h-4 text-indigo-500" />
+              <span className="font-medium">Ricorrente</span>
+              <span className="text-gray-400">(si ripete ogni anno — usato negli Scenari)</span>
+            </label>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="secondary" onClick={() => { setEditModalOpen(false); setEditMovimento(null) }}>Annulla</Button>
               <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Aggiorna Movimento'}</Button>
@@ -379,6 +387,12 @@ export function ContabilitaClient({
             <div><label className="text-sm font-medium block mb-1">Riferimento</label><Select value={form.riferimentoId ? `${form.riferimentoTipo}-${form.riferimentoId}` : ''} onChange={e => { const val = e.target.value; if (!val) { setForm({ ...form, riferimentoId: '', riferimentoTipo: '', riferimento: '' }); return }; const [tipo, idStr] = val.split('-'); const rif = riferimenti.find(r => r.tipo === tipo && r.id === parseInt(idStr)); setForm({ ...form, riferimentoId: idStr, riferimentoTipo: tipo, riferimento: rif?.label ?? '' }) }}><option value="">Nessuno</option>{riferimenti.map(r => (<option key={`${r.tipo}-${r.id}`} value={`${r.tipo}-${r.id}`}>{r.label}</option>))}</Select></div>
           </div>
           <div><label className="text-sm font-medium block mb-1">Descrizione</label><Input value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} /></div>
+          <label className="flex items-center gap-2 cursor-pointer select-none text-sm">
+            <input type="checkbox" checked={form.ricorrente} onChange={e => setForm({ ...form, ricorrente: e.target.checked })} className="w-4 h-4 rounded accent-indigo-600" />
+            <Repeat2 className="w-4 h-4 text-indigo-500" />
+            <span className="font-medium">Ricorrente</span>
+            <span className="text-gray-400">(si ripete ogni anno — usato negli Scenari)</span>
+          </label>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Annulla</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Salva'}</Button>

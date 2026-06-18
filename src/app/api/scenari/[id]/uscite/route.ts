@@ -11,7 +11,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         luogo: { select: { id: true, nome: true } },
         terreno: { select: { id: true, nome: true } },
       },
-      orderBy: [{ anno: 'asc' }, { categoria: 'asc' }],
+      orderBy: [{ tipologia: 'asc' }, { anno: 'asc' }, { categoria: 'asc' }],
     })
     return NextResponse.json(items)
   })
@@ -23,11 +23,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const ruolo = await withRuoloScrittura(aziendaId)
     if (!ruolo.allowed) return ruolo.response!
     const body = await req.json()
+    const tipologia = body.tipologia ?? 'corrente'
     const item = await prisma.scenarioUscita.create({
       data: {
         scenarioId,
         aziendaId,
-        anno: parseInt(body.anno),
+        tipologia,
+        anno: tipologia === 'ricorrente' ? null : (body.anno ? parseInt(body.anno) : null),
         categoria: body.categoria,
         descrizione: body.descrizione,
         importo: parseFloat(body.importo),

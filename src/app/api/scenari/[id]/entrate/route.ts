@@ -12,7 +12,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         luogo: { select: { id: true, nome: true } },
         terreno: { select: { id: true, nome: true } },
       },
-      orderBy: [{ anno: 'asc' }, { tipo: 'asc' }],
+      orderBy: [{ naturaTipo: 'asc' }, { anno: 'asc' }, { tipo: 'asc' }],
     })
     return NextResponse.json(items)
   })
@@ -24,11 +24,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const ruolo = await withRuoloScrittura(aziendaId)
     if (!ruolo.allowed) return ruolo.response!
     const body = await req.json()
+    const naturaTipo = body.naturaTipo ?? 'stimata'
     const item = await prisma.scenarioEntrata.create({
       data: {
         scenarioId,
         aziendaId,
-        anno: parseInt(body.anno),
+        naturaTipo,
+        anno: naturaTipo === 'ricorrente' ? null : (body.anno ? parseInt(body.anno) : null),
         tipo: body.tipo,
         descrizione: body.descrizione,
         prodottoId: body.prodottoId ? parseInt(body.prodottoId) : null,

@@ -12,10 +12,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string; ob
       where: { id },
       data: {
         ...(body.nome !== undefined && { nome: body.nome }),
-        ...(body.tipo !== undefined && { tipo: body.tipo }),
-        ...(body.percentuale !== undefined && { percentuale: body.percentuale ? parseFloat(body.percentuale) : null }),
-        ...(body.importoFisso !== undefined && { importoFisso: body.importoFisso ? parseFloat(body.importoFisso) : null }),
-        ...(body.priorita !== undefined && { priorita: parseInt(body.priorita) }),
+        ...(body.categoria !== undefined && { categoria: body.categoria }),
+        ...(body.percentualePriorita !== undefined && { percentualePriorita: parseFloat(body.percentualePriorita) }),
+        ...(body.importoTarget !== undefined && { importoTarget: parseFloat(body.importoTarget) }),
         ...(body.note !== undefined && { note: body.note ?? null }),
       },
     })

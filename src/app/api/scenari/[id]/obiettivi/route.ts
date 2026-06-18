@@ -7,7 +7,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return withAzienda(async (aziendaId) => {
     const items = await prisma.scenarioObiettivo.findMany({
       where: { scenarioId, aziendaId },
-      orderBy: { priorita: 'asc' },
+      orderBy: { percentualePriorita: 'desc' },
     })
     return NextResponse.json(items)
   })
@@ -24,10 +24,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         scenarioId,
         aziendaId,
         nome: body.nome,
-        tipo: body.tipo ?? 'altro',
-        percentuale: body.percentuale ? parseFloat(body.percentuale) : null,
-        importoFisso: body.importoFisso ? parseFloat(body.importoFisso) : null,
-        priorita: parseInt(body.priorita ?? '1'),
+        categoria: body.categoria ?? 'altro',
+        percentualePriorita: body.percentualePriorita ? parseFloat(body.percentualePriorita) : 0,
+        importoTarget: body.importoTarget ? parseFloat(body.importoTarget) : 0,
         note: body.note ?? null,
       },
     })

@@ -25,6 +25,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         categoria: body.categoria ?? undefined,
         descrizione: body.descrizione ?? undefined,
         stato: body.stato ?? undefined,
+        ricorrente: body.ricorrente !== undefined ? body.ricorrente : undefined,
       },
       include: {
         cassa: { select: { nome: true } },

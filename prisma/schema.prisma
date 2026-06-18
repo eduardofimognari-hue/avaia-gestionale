@@ -495,6 +495,7 @@ model MovimentiCassa {
   riferimentoId Int?
   riferimentoTipo String?
   stato         String   @default("pagato")
+  ricorrente    Boolean  @default(false)
   creatoIl      DateTime @default(now())
   aziendaId     Int
   azienda       Azienda  @relation(fields: [aziendaId], references: [id])
@@ -703,7 +704,8 @@ model ScenarioUscita {
   id          Int       @id @default(autoincrement())
   scenarioId  Int
   scenario    Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
-  anno        Int
+  tipologia   String    @default("corrente")
+  anno        Int?
   categoria   String
   descrizione String
   importo     Float
@@ -722,7 +724,8 @@ model ScenarioEntrata {
   id              Int       @id @default(autoincrement())
   scenarioId      Int
   scenario        Scenario  @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
-  anno            Int
+  naturaTipo      String    @default("stimata")
+  anno            Int?
   tipo            String
   descrizione     String
   prodottoId      Int?
@@ -742,17 +745,16 @@ model ScenarioEntrata {
 }
 
 model ScenarioObiettivo {
-  id           Int      @id @default(autoincrement())
-  scenarioId   Int
-  scenario     Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
-  nome         String
-  tipo         String   @default("altro")
-  percentuale  Float?
-  importoFisso Float?
-  priorita     Int      @default(1)
-  note         String?
-  creatoIl     DateTime @default(now())
-  aziendaId    Int
+  id                  Int      @id @default(autoincrement())
+  scenarioId          Int
+  scenario            Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  nome                String
+  categoria           String   @default("altro")
+  percentualePriorita Float    @default(0)
+  importoTarget       Float    @default(0)
+  note                String?
+  creatoIl            DateTime @default(now())
+  aziendaId           Int
   @@index([scenarioId])
   @@index([aziendaId])
 }

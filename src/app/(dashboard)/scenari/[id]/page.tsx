@@ -8,34 +8,31 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table'
 import { Modal } from '@/components/ui/modal'
-import { ArrowLeft, Plus, Trash2, Pencil, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Clock } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Pencil, CheckCircle, AlertCircle, Clock, Repeat2, Target, Info } from 'lucide-react'
 
 // ────────── types ──────────
 type Scenario = { id: number; nome: string; descrizione: string | null; annoInizio: number; annoFine: number; stato: string }
 type Luogo = { id: number; nome: string }
 type Terreno = { id: number; nome: string; luogoId: number | null }
 type Prodotto = { id: number; nome: string; codice: string; unitaMisura: string }
-type Uscita = { id: number; anno: number; categoria: string; descrizione: string; importo: number; note: string | null; luogo: Luogo | null; terreno: Terreno | null }
-type Entrata = { id: number; anno: number; tipo: string; descrizione: string; quantitaStimata: number | null; prezzoStimato: number | null; importoFisso: number | null; note: string | null; prodotto: Prodotto | null; luogo: Luogo | null; terreno: Terreno | null }
-type Obiettivo = { id: number; nome: string; tipo: string; percentuale: number | null; importoFisso: number | null; priorita: number; note: string | null }
-type CruscottoAnno = { anno: number; entratePreviste: number; uscitePreviste: number; nettoPrevisto: number; entratoReale: number; usciteReali: number; nettoReale: number; scostamentoNetto: number }
-type CruscottoObiettivo = { id: number; nome: string; tipo: string; importoTarget: number; importoCoperto: number; percentualeCoperta: number; stato: string }
-type Cruscotto = { anni: number[]; perAnno: CruscottoAnno[]; totale: { entratePreviste: number; uscitePreviste: number; nettoPrevisto: number; entratoReale: number; usciteReali: number; nettoReale: number }; obiettivi: CruscottoObiettivo[] }
+type Uscita = { id: number; anno: number | null; tipologia: string; categoria: string; descrizione: string; importo: number; note: string | null; luogo: Luogo | null; terreno: Terreno | null }
+type Entrata = { id: number; anno: number | null; naturaTipo: string; tipo: string; descrizione: string; quantitaStimata: number | null; prezzoStimato: number | null; importoFisso: number | null; note: string | null; prodotto: Prodotto | null; luogo: Luogo | null; terreno: Terreno | null }
+type Obiettivo = { id: number; nome: string; categoria: string; percentualePriorita: number; importoTarget: number; note: string | null }
+type CruscottoAnno = { anno: number; entrateStimate: number; entrateRicorrentiScenario: number; entrateRicorrentiCassa: number; totEntrate: number; usciteCorrenti: number; usciteRicorrentiScenario: number; usciteRicorrentiCassa: number; totUscite: number; surplus: number; allocatoObiettivi: number; residuo: number }
+type CruscottoObiettivo = { id: number; nome: string; categoria: string; percentualePriorita: number; importoTarget: number; totalAllocato: number; percentualeCoperta: number; annoCompletamento: number | null; stato: string; allocazionePerAnno: { anno: number; quota: number; allocato: number }[]; note: string | null }
+type Cruscotto = { anni: number[]; perAnno: CruscottoAnno[]; totale: { totEntrate: number; totUscite: number; surplus: number; allocatoObiettivi: number; residuo: number }; obiettivi: CruscottoObiettivo[]; movimentiRicorrentiCassa: { entrate: number; uscite: number; count: number } }
 
 // ────────── helpers ──────────
 const fmt = (n: number) => n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })
-const sign = (n: number) => n >= 0 ? `+${fmt(n)}` : fmt(n)
 
 const CATEGORIE_USCITA = ['Lavori agricoli', 'Manodopera', 'Materiali e forniture', 'Attrezzature e macchinari', 'Servizi esterni', 'Utenze e costi fissi', 'Imposte e tasse', 'Altro']
+const CATEGORIE_OBIETTIVO = ['attrezzature', 'strutture', 'terreni', 'tecnologia', 'altro']
 const TIPI_ENTRATA = [{ value: 'produzione', label: 'Produzione (qty × prezzo)' }, { value: 'servizio', label: 'Servizio (importo fisso)' }, { value: 'altro', label: 'Altro (importo fisso)' }]
-const TIPI_OBIETTIVO = [{ value: 'distribuzione_utili', label: 'Distribuzione utili soci' }, { value: 'reinvestimento', label: 'Reinvestimento' }, { value: 'riserva', label: 'Fondo di riserva' }, { value: 'imposte', label: 'Imposte e tasse' }, { value: 'spese_gestione', label: 'Spese di gestione' }, { value: 'altro', label: 'Altro' }]
 const STATO_VARIANT: Record<string, 'default' | 'success' | 'info'> = { bozza: 'default', attivo: 'success', archiviato: 'info' }
 const STATO_LABELS: Record<string, string> = { bozza: 'Bozza', attivo: 'Attivo', archiviato: 'Archiviato' }
 
-function anni(from: number, to: number) {
-  const result = []
-  for (let a = from; a <= to; a++) result.push(a)
-  return result
+function annoList(from: number, to: number) {
+  const r = []; for (let a = from; a <= to; a++) r.push(a); return r
 }
 
 // ────────── main component ──────────
@@ -62,12 +59,12 @@ export default function ScenarioDetailPage() {
   const [addUscita, setAddUscita] = useState(false)
   const [addEntrata, setAddEntrata] = useState(false)
   const [addObiettivo, setAddObiettivo] = useState(false)
-  const [editObiettivo, setEditObiettivo] = useState<Obiettivo | null>(null)
+  const [editObiettivoModal, setEditObiettivoModal] = useState<Obiettivo | null>(null)
 
   // forms
-  const emptyU = { anno: '', categoria: CATEGORIE_USCITA[0], descrizione: '', importo: '', luogoId: '', terrenoId: '', note: '' }
-  const emptyE = { anno: '', tipo: 'produzione', descrizione: '', prodottoId: '', luogoId: '', terrenoId: '', quantitaStimata: '', prezzoStimato: '', importoFisso: '', note: '' }
-  const emptyO = { nome: '', tipo: 'altro', metodo: 'percentuale' as 'percentuale' | 'fisso', percentuale: '', importoFisso: '', priorita: '1', note: '' }
+  const emptyU = { tipologia: 'corrente' as 'corrente' | 'ricorrente', anno: '', categoria: CATEGORIE_USCITA[0], descrizione: '', importo: '', luogoId: '', terrenoId: '', note: '' }
+  const emptyE = { naturaTipo: 'stimata' as 'stimata' | 'ricorrente', anno: '', tipo: 'produzione', descrizione: '', prodottoId: '', luogoId: '', terrenoId: '', quantitaStimata: '', prezzoStimato: '', importoFisso: '', note: '' }
+  const emptyO = { nome: '', categoria: 'altro', percentualePriorita: '', importoTarget: '', note: '' }
   const [uf, setUf] = useState(emptyU)
   const [ef, setEf] = useState(emptyE)
   const [of, setOf] = useState(emptyO)
@@ -106,17 +103,14 @@ export default function ScenarioDetailPage() {
   useEffect(() => { fetchAll() }, [fetchAll])
   useEffect(() => { if (activeTab === 'cruscotto') fetchCruscotto() }, [activeTab, fetchCruscotto])
 
-  // ────────── prezzo medio hint ──────────
+  // prezzo medio hint
   useEffect(() => {
     if (ef.tipo !== 'produzione' || !ef.prodottoId) { setPrezzoMedioHint(null); return }
     fetch(`/api/prodotti/${ef.prodottoId}/prezzo-medio`)
       .then(r => r.json())
       .then(d => {
-        if (d.prezzoMedio && d.numVendite > 0) {
-          setPrezzoMedioHint(`Media storica: ${fmt(d.prezzoMedio)} (${d.numVendite} vendite)`)
-        } else {
-          setPrezzoMedioHint('Nessuno storico vendite – inserisci prezzo manualmente')
-        }
+        if (d.prezzoMedio && d.numVendite > 0) setPrezzoMedioHint(`Media storica: ${fmt(d.prezzoMedio)} (${d.numVendite} vendite)`)
+        else setPrezzoMedioHint('Nessuno storico – inserisci prezzo manualmente')
       })
       .catch(() => setPrezzoMedioHint(null))
   }, [ef.prodottoId, ef.tipo])
@@ -124,7 +118,7 @@ export default function ScenarioDetailPage() {
   if (loading) return <div className="p-6 text-gray-500">Caricamento...</div>
   if (!scenario) return <div className="p-6 text-red-500">Scenario non trovato</div>
 
-  const annoList = anni(scenario.annoInizio, scenario.annoFine)
+  const anni = annoList(scenario.annoInizio, scenario.annoFine)
 
   // ────────── azioni scenario ──────────
   function openEditScenario() {
@@ -133,27 +127,23 @@ export default function ScenarioDetailPage() {
   }
 
   async function handleEditScenario(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
+    e.preventDefault(); setSaving(true)
     try {
       const res = await fetch(`/api/scenari/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editSf) })
       if (!res.ok) throw new Error()
-      setEditScenario(false)
-      await fetchAll()
+      setEditScenario(false); await fetchAll()
     } catch { setError('Errore aggiornamento') }
     finally { setSaving(false) }
   }
 
   // ────────── uscite ──────────
   async function handleAddUscita(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
+    e.preventDefault(); setSaving(true)
     try {
       const res = await fetch(`/api/scenari/${id}/uscite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(uf) })
       if (!res.ok) throw new Error()
       setAddUscita(false); setUf(emptyU)
-      const u = await fetch(`/api/scenari/${id}/uscite`).then(r => r.json())
-      setUscite(Array.isArray(u) ? u : [])
+      setUscite(await fetch(`/api/scenari/${id}/uscite`).then(r => r.json()).then(d => Array.isArray(d) ? d : []))
     } catch { setError('Errore salvataggio uscita') }
     finally { setSaving(false) }
   }
@@ -166,14 +156,12 @@ export default function ScenarioDetailPage() {
 
   // ────────── entrate ──────────
   async function handleAddEntrata(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
+    e.preventDefault(); setSaving(true)
     try {
       const res = await fetch(`/api/scenari/${id}/entrate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ef) })
       if (!res.ok) throw new Error()
       setAddEntrata(false); setEf(emptyE); setPrezzoMedioHint(null)
-      const en = await fetch(`/api/scenari/${id}/entrate`).then(r => r.json())
-      setEntrate(Array.isArray(en) ? en : [])
+      setEntrate(await fetch(`/api/scenari/${id}/entrate`).then(r => r.json()).then(d => Array.isArray(d) ? d : []))
     } catch { setError('Errore salvataggio entrata') }
     finally { setSaving(false) }
   }
@@ -186,50 +174,32 @@ export default function ScenarioDetailPage() {
 
   // ────────── obiettivi ──────────
   async function handleAddObiettivo(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    const payload = {
-      nome: of.nome, tipo: of.tipo, priorita: of.priorita, note: of.note,
-      percentuale: of.metodo === 'percentuale' ? of.percentuale : null,
-      importoFisso: of.metodo === 'fisso' ? of.importoFisso : null,
-    }
+    e.preventDefault(); setSaving(true)
     try {
-      const res = await fetch(`/api/scenari/${id}/obiettivi`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const res = await fetch(`/api/scenari/${id}/obiettivi`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: of.nome, categoria: of.categoria, percentualePriorita: of.percentualePriorita, importoTarget: of.importoTarget, note: of.note }) })
       if (!res.ok) throw new Error()
       setAddObiettivo(false); setOf(emptyO)
-      const ob = await fetch(`/api/scenari/${id}/obiettivi`).then(r => r.json())
-      setObiettivi(Array.isArray(ob) ? ob : [])
+      setObiettivi(await fetch(`/api/scenari/${id}/obiettivi`).then(r => r.json()).then(d => Array.isArray(d) ? d : []))
     } catch { setError('Errore salvataggio obiettivo') }
     finally { setSaving(false) }
   }
 
   async function handleEditObiettivo(e: React.FormEvent) {
     e.preventDefault()
-    if (!editObiettivo) return
+    if (!editObiettivoModal) return
     setSaving(true)
-    const payload = {
-      nome: of.nome, tipo: of.tipo, priorita: of.priorita, note: of.note,
-      percentuale: of.metodo === 'percentuale' ? of.percentuale : null,
-      importoFisso: of.metodo === 'fisso' ? of.importoFisso : null,
-    }
     try {
-      const res = await fetch(`/api/scenari/${id}/obiettivi/${editObiettivo.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const res = await fetch(`/api/scenari/${id}/obiettivi/${editObiettivoModal.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: of.nome, categoria: of.categoria, percentualePriorita: of.percentualePriorita, importoTarget: of.importoTarget, note: of.note }) })
       if (!res.ok) throw new Error()
-      setEditObiettivo(null); setOf(emptyO)
-      const ob = await fetch(`/api/scenari/${id}/obiettivi`).then(r => r.json())
-      setObiettivi(Array.isArray(ob) ? ob : [])
+      setEditObiettivoModal(null); setOf(emptyO)
+      setObiettivi(await fetch(`/api/scenari/${id}/obiettivi`).then(r => r.json()).then(d => Array.isArray(d) ? d : []))
     } catch { setError('Errore aggiornamento obiettivo') }
     finally { setSaving(false) }
   }
 
   function openEditObiettivo(ob: Obiettivo) {
-    setOf({
-      nome: ob.nome, tipo: ob.tipo, priorita: String(ob.priorita), note: ob.note ?? '',
-      metodo: ob.importoFisso !== null ? 'fisso' : 'percentuale',
-      percentuale: ob.percentuale !== null ? String(ob.percentuale) : '',
-      importoFisso: ob.importoFisso !== null ? String(ob.importoFisso) : '',
-    })
-    setEditObiettivo(ob)
+    setOf({ nome: ob.nome, categoria: ob.categoria, percentualePriorita: String(ob.percentualePriorita), importoTarget: String(ob.importoTarget), note: ob.note ?? '' })
+    setEditObiettivoModal(ob)
   }
 
   async function deleteObiettivo(oid: number) {
@@ -239,79 +209,15 @@ export default function ScenarioDetailPage() {
   }
 
   // ────────── computed ──────────
-  const totUscite = uscite.reduce((s, u) => s + u.importo, 0)
-  const totEntrate = entrate.reduce((s, e) => {
-    if (e.tipo === 'produzione') return s + (e.quantitaStimata ?? 0) * (e.prezzoStimato ?? 0)
-    return s + (e.importoFisso ?? 0)
-  }, 0)
-  const nettoStimato = totEntrate - totUscite
-
   function entrataImporto(e: Entrata) {
     if (e.tipo === 'produzione') return (e.quantitaStimata ?? 0) * (e.prezzoStimato ?? 0)
     return e.importoFisso ?? 0
   }
 
-  // ────────── obiettivo form ──────────
-  function ObiettivoForm({ onSubmit, submitLabel }: { onSubmit: (e: React.FormEvent) => void; submitLabel: string }) {
-    const nettoRef = totEntrate - totUscite
-    const importoCalcolato = of.metodo === 'percentuale' && of.percentuale
-      ? nettoRef * parseFloat(of.percentuale) / 100
-      : null
-
-    return (
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="text-sm font-medium block mb-1">Nome obiettivo *</label>
-          <Input value={of.nome} onChange={e => setOf({ ...of, nome: e.target.value })} placeholder="Es. Distribuzione utili soci" required />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium block mb-1">Tipo</label>
-            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={of.tipo} onChange={e => setOf({ ...of, tipo: e.target.value })}>
-              {TIPI_OBIETTIVO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Priorità</label>
-            <Input type="number" min={1} value={of.priorita} onChange={e => setOf({ ...of, priorita: e.target.value })} required />
-          </div>
-        </div>
-        <div>
-          <label className="text-sm font-medium block mb-1">Metodo di calcolo</label>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-              <input type="radio" checked={of.metodo === 'percentuale'} onChange={() => setOf({ ...of, metodo: 'percentuale' })} />
-              % del netto previsto
-            </label>
-            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-              <input type="radio" checked={of.metodo === 'fisso'} onChange={() => setOf({ ...of, metodo: 'fisso' })} />
-              Importo fisso
-            </label>
-          </div>
-        </div>
-        {of.metodo === 'percentuale' ? (
-          <div>
-            <label className="text-sm font-medium block mb-1">Percentuale %</label>
-            <Input type="number" step="0.1" min={0} max={100} value={of.percentuale} onChange={e => setOf({ ...of, percentuale: e.target.value })} placeholder="Es. 30" required />
-            {importoCalcolato !== null && <p className="text-xs text-gray-500 mt-1">= {fmt(importoCalcolato)} sul netto previsto attuale ({fmt(nettoRef)})</p>}
-          </div>
-        ) : (
-          <div>
-            <label className="text-sm font-medium block mb-1">Importo fisso (€)</label>
-            <Input type="number" step="0.01" min={0} value={of.importoFisso} onChange={e => setOf({ ...of, importoFisso: e.target.value })} placeholder="Es. 10000" required />
-          </div>
-        )}
-        <div>
-          <label className="text-sm font-medium block mb-1">Note</label>
-          <Input value={of.note} onChange={e => setOf({ ...of, note: e.target.value })} />
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={() => { setAddObiettivo(false); setEditObiettivo(null); setOf(emptyO) }}>Annulla</Button>
-          <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : submitLabel}</Button>
-        </div>
-      </form>
-    )
-  }
+  const usciteCorrenti = uscite.filter(u => u.tipologia === 'corrente')
+  const usciteRicorrenti = uscite.filter(u => u.tipologia === 'ricorrente')
+  const entrateStimate = entrate.filter(e => e.naturaTipo === 'stimata')
+  const entrateRicorrenti = entrate.filter(e => e.naturaTipo === 'ricorrente')
 
   const tabs = [
     { key: 'uscite', label: `Uscite (${uscite.length})` },
@@ -320,9 +226,62 @@ export default function ScenarioDetailPage() {
     { key: 'cruscotto', label: 'Cruscotto' },
   ] as const
 
+  // ────────── obiettivo form component ──────────
+  function ObiettivoForm({ onSubmit, submitLabel }: { onSubmit: (e: React.FormEvent) => void; submitLabel: string }) {
+    const totalPriorita = obiettivi.reduce((s, o) => s + o.percentualePriorita, 0) + (parseFloat(of.percentualePriorita) || 0)
+    const isEditing = !!editObiettivoModal
+    const totalSenzaCorrente = obiettivi
+      .filter(o => !isEditing || o.id !== editObiettivoModal?.id)
+      .reduce((s, o) => s + o.percentualePriorita, 0)
+    const disponibile = 100 - totalSenzaCorrente
+
+    return (
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div>
+          <label className="text-sm font-medium block mb-1">Nome obiettivo *</label>
+          <Input value={of.nome} onChange={e => setOf({ ...of, nome: e.target.value })} placeholder="Es. Acquisto trattore" required />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium block mb-1">Categoria</label>
+            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={of.categoria} onChange={e => setOf({ ...of, categoria: e.target.value })}>
+              {CATEGORIE_OBIETTIVO.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Importo target (€) *</label>
+            <Input type="number" step="0.01" min={0} value={of.importoTarget} onChange={e => setOf({ ...of, importoTarget: e.target.value })} placeholder="Es. 50000" required />
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1 flex items-center gap-1">
+            Priorità % del surplus annuo *
+            <span className="text-[10px] font-normal text-gray-400 ml-1">Disponibile: {disponibile.toFixed(0)}%</span>
+          </label>
+          <div className="flex items-center gap-2">
+            <Input type="number" step="1" min={0} max={100} value={of.percentualePriorita} onChange={e => setOf({ ...of, percentualePriorita: e.target.value })} placeholder="Es. 30" required className="flex-1" />
+            <span className="text-sm text-gray-500">%</span>
+          </div>
+          {totalPriorita > 100 && (
+            <p className="text-xs text-amber-600 mt-1">Totale priorità supera 100% ({totalPriorita.toFixed(0)}%). Gli obiettivi possono sovrapporsi sul surplus.</p>
+          )}
+          <p className="text-xs text-gray-400 mt-1">Ogni anno, questo obiettivo riceve il {of.percentualePriorita || '?'}% del surplus disponibile finché non è completato.</p>
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">Note</label>
+          <Input value={of.note} onChange={e => setOf({ ...of, note: e.target.value })} />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={() => { setAddObiettivo(false); setEditObiettivoModal(null); setOf(emptyO) }}>Annulla</Button>
+          <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : submitLabel}</Button>
+        </div>
+      </form>
+    )
+  }
+
   return (
     <div>
-      {/* ── header ── */}
+      {/* header */}
       <div className="mb-6">
         <button onClick={() => router.push('/scenari')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-3">
           <ArrowLeft className="w-4 h-4" />Scenari
@@ -346,37 +305,12 @@ export default function ScenarioDetailPage() {
 
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
-      {/* ── summary cards ── */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-gray-500 mb-1">Entrate stimate totali</p>
-            <p className="text-xl font-bold text-green-600">{fmt(totEntrate)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-gray-500 mb-1">Uscite stimate totali</p>
-            <p className="text-xl font-bold text-red-500">{fmt(totUscite)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-gray-500 mb-1">Netto stimato</p>
-            <p className={`text-xl font-bold ${nettoStimato >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>{fmt(nettoStimato)}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── tabs ── */}
+      {/* tabs */}
       <div className="border-b border-gray-200 mb-6">
         <div className="flex gap-0">
           {tabs.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === t.key ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            >
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === t.key ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
               {t.label}
             </button>
           ))}
@@ -385,23 +319,24 @@ export default function ScenarioDetailPage() {
 
       {/* ──────────── TAB: USCITE ──────────── */}
       {activeTab === 'uscite' && (
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <p className="text-sm text-gray-500">Costi e spese previste per anno e categoria</p>
-            <Button onClick={() => { setUf({ ...emptyU, anno: String(scenario.annoInizio) }); setAddUscita(true) }}>
-              <Plus className="w-4 h-4 mr-2" />Aggiungi Uscita
-            </Button>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-500">Distingui tra spese correnti (per anno specifico) e spese ricorrenti (ogni anno)</p>
+            <Button onClick={() => { setUf(emptyU); setAddUscita(true) }}><Plus className="w-4 h-4 mr-2" />Aggiungi Uscita</Button>
           </div>
-          <Card>
-            <CardContent className="p-0">
+
+          {/* Correnti */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              Spese correnti <span className="text-gray-400 font-normal text-xs">(specifiche per anno)</span>
+            </h3>
+            <Card><CardContent className="p-0">
               <Table>
-                <Thead>
-                  <Tr><Th>Anno</Th><Th>Categoria</Th><Th>Descrizione</Th><Th>Luogo / Terreno</Th><Th className="text-right">Importo</Th><Th className="w-12"></Th></Tr>
-                </Thead>
+                <Thead><Tr><Th>Anno</Th><Th>Categoria</Th><Th>Descrizione</Th><Th>Luogo / Terreno</Th><Th className="text-right">Importo</Th><Th className="w-12"></Th></Tr></Thead>
                 <Tbody>
-                  {uscite.map(u => (
+                  {usciteCorrenti.map(u => (
                     <Tr key={u.id}>
-                      <Td><Badge variant="default">{u.anno}</Badge></Td>
+                      <Td><Badge variant="default">{u.anno ?? '—'}</Badge></Td>
                       <Td className="text-sm text-gray-700">{u.categoria}</Td>
                       <Td className="text-sm">{u.descrizione}</Td>
                       <Td className="text-sm text-gray-500">{[u.luogo?.nome, u.terreno?.nome].filter(Boolean).join(' / ') || '—'}</Td>
@@ -409,41 +344,66 @@ export default function ScenarioDetailPage() {
                       <Td><Button variant="ghost" size="sm" onClick={() => deleteUscita(u.id)}><Trash2 className="w-4 h-4 text-red-400" /></Button></Td>
                     </Tr>
                   ))}
-                  {uscite.length === 0 && <Tr><Td colSpan={6} className="text-center text-gray-400 py-8">Nessuna uscita inserita</Td></Tr>}
+                  {usciteCorrenti.length === 0 && <Tr><Td colSpan={6} className="text-center text-gray-400 py-6">Nessuna spesa corrente</Td></Tr>}
                 </Tbody>
               </Table>
-            </CardContent>
-          </Card>
-          {annoList.length > 1 && (
-            <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(annoList.length, 4)}, 1fr)` }}>
-              {annoList.map(a => {
-                const tot = uscite.filter(u => u.anno === a).reduce((s, u) => s + u.importo, 0)
-                return <Card key={a}><CardContent className="p-3"><p className="text-xs text-gray-500">{a}</p><p className="font-semibold text-red-600 text-sm">{fmt(tot)}</p></CardContent></Card>
-              })}
-            </div>
-          )}
+            </CardContent></Card>
+            {anni.length > 1 && usciteCorrenti.length > 0 && (
+              <div className="mt-3 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(anni.length, 5)}, 1fr)` }}>
+                {anni.map(a => {
+                  const tot = usciteCorrenti.filter(u => u.anno === a).reduce((s, u) => s + u.importo, 0)
+                  return <Card key={a}><CardContent className="p-3"><p className="text-xs text-gray-500">{a}</p><p className="font-semibold text-red-600 text-sm">{fmt(tot)}</p></CardContent></Card>
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Ricorrenti */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <Repeat2 className="w-4 h-4 text-indigo-500" />Spese ricorrenti <span className="text-gray-400 font-normal text-xs">(si ripetono ogni anno del piano)</span>
+            </h3>
+            <Card><CardContent className="p-0">
+              <Table>
+                <Thead><Tr><Th>Categoria</Th><Th>Descrizione</Th><Th>Luogo / Terreno</Th><Th className="text-right">Importo/anno</Th><Th className="w-12"></Th></Tr></Thead>
+                <Tbody>
+                  {usciteRicorrenti.map(u => (
+                    <Tr key={u.id}>
+                      <Td className="text-sm text-gray-700">{u.categoria}</Td>
+                      <Td className="text-sm">{u.descrizione}</Td>
+                      <Td className="text-sm text-gray-500">{[u.luogo?.nome, u.terreno?.nome].filter(Boolean).join(' / ') || '—'}</Td>
+                      <Td className="text-right font-medium text-red-600">{fmt(u.importo)}</Td>
+                      <Td><Button variant="ghost" size="sm" onClick={() => deleteUscita(u.id)}><Trash2 className="w-4 h-4 text-red-400" /></Button></Td>
+                    </Tr>
+                  ))}
+                  {usciteRicorrenti.length === 0 && <Tr><Td colSpan={5} className="text-center text-gray-400 py-6">Nessuna spesa ricorrente nello scenario</Td></Tr>}
+                </Tbody>
+              </Table>
+            </CardContent></Card>
+          </div>
         </div>
       )}
 
       {/* ──────────── TAB: ENTRATE ──────────── */}
       {activeTab === 'entrate' && (
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <p className="text-sm text-gray-500">Entrate stimate da produzione, servizi o altro</p>
-            <Button onClick={() => { setEf({ ...emptyE, anno: String(scenario.annoInizio) }); setAddEntrata(true) }}>
-              <Plus className="w-4 h-4 mr-2" />Aggiungi Entrata
-            </Button>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-500">Entrate stimate per anno e entrate ricorrenti (lette automaticamente dai movimenti cassa taggati come ricorrenti)</p>
+            <Button onClick={() => { setEf(emptyE); setAddEntrata(true) }}><Plus className="w-4 h-4 mr-2" />Aggiungi Entrata</Button>
           </div>
-          <Card>
-            <CardContent className="p-0">
+
+          {/* Stimate */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              Entrate stimate <span className="text-gray-400 font-normal text-xs">(specifiche per anno)</span>
+            </h3>
+            <Card><CardContent className="p-0">
               <Table>
-                <Thead>
-                  <Tr><Th>Anno</Th><Th>Tipo</Th><Th>Descrizione</Th><Th>Dettaglio</Th><Th className="text-right">Importo</Th><Th className="w-12"></Th></Tr>
-                </Thead>
+                <Thead><Tr><Th>Anno</Th><Th>Tipo</Th><Th>Descrizione</Th><Th>Dettaglio</Th><Th className="text-right">Importo</Th><Th className="w-12"></Th></Tr></Thead>
                 <Tbody>
-                  {entrate.map(e => (
+                  {entrateStimate.map(e => (
                     <Tr key={e.id}>
-                      <Td><Badge variant="default">{e.anno}</Badge></Td>
+                      <Td><Badge variant="default">{e.anno ?? '—'}</Badge></Td>
                       <Td><Badge variant="info">{e.tipo === 'produzione' ? 'Produzione' : e.tipo === 'servizio' ? 'Servizio' : 'Altro'}</Badge></Td>
                       <Td className="text-sm">{e.descrizione}</Td>
                       <Td className="text-xs text-gray-500">
@@ -456,207 +416,216 @@ export default function ScenarioDetailPage() {
                       <Td><Button variant="ghost" size="sm" onClick={() => deleteEntrata(e.id)}><Trash2 className="w-4 h-4 text-red-400" /></Button></Td>
                     </Tr>
                   ))}
-                  {entrate.length === 0 && <Tr><Td colSpan={6} className="text-center text-gray-400 py-8">Nessuna entrata inserita</Td></Tr>}
+                  {entrateStimate.length === 0 && <Tr><Td colSpan={6} className="text-center text-gray-400 py-6">Nessuna entrata stimata</Td></Tr>}
                 </Tbody>
               </Table>
-            </CardContent>
-          </Card>
-          {annoList.length > 1 && (
-            <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(annoList.length, 4)}, 1fr)` }}>
-              {annoList.map(a => {
-                const tot = entrate.filter(e => e.anno === a).reduce((s, e) => s + entrataImporto(e), 0)
-                return <Card key={a}><CardContent className="p-3"><p className="text-xs text-gray-500">{a}</p><p className="font-semibold text-green-600 text-sm">{fmt(tot)}</p></CardContent></Card>
-              })}
+            </CardContent></Card>
+            {anni.length > 1 && entrateStimate.length > 0 && (
+              <div className="mt-3 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(anni.length, 5)}, 1fr)` }}>
+                {anni.map(a => {
+                  const tot = entrateStimate.filter(e => e.anno === a).reduce((s, e) => s + entrataImporto(e), 0)
+                  return <Card key={a}><CardContent className="p-3"><p className="text-xs text-gray-500">{a}</p><p className="font-semibold text-green-600 text-sm">{fmt(tot)}</p></CardContent></Card>
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Ricorrenti nello scenario */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <Repeat2 className="w-4 h-4 text-indigo-500" />Entrate ricorrenti nello scenario <span className="text-gray-400 font-normal text-xs">(si ripetono ogni anno)</span>
+            </h3>
+            {entrateRicorrenti.length === 0
+              ? <div className="text-sm text-gray-400 bg-gray-50 rounded-lg p-4">Nessuna entrata ricorrente aggiunta allo scenario.</div>
+              : <Card><CardContent className="p-0">
+                <Table>
+                  <Thead><Tr><Th>Tipo</Th><Th>Descrizione</Th><Th>Dettaglio</Th><Th className="text-right">Importo/anno</Th><Th className="w-12"></Th></Tr></Thead>
+                  <Tbody>
+                    {entrateRicorrenti.map(e => (
+                      <Tr key={e.id}>
+                        <Td><Badge variant="info">{e.tipo === 'produzione' ? 'Produzione' : e.tipo === 'servizio' ? 'Servizio' : 'Altro'}</Badge></Td>
+                        <Td className="text-sm">{e.descrizione}</Td>
+                        <Td className="text-xs text-gray-500">
+                          {e.tipo === 'produzione'
+                            ? `${e.prodotto?.nome ?? '?'} · ${e.quantitaStimata} ${e.prodotto?.unitaMisura ?? ''} × ${fmt(e.prezzoStimato ?? 0)}`
+                            : fmt(e.importoFisso ?? 0)}
+                        </Td>
+                        <Td className="text-right font-medium text-green-600">{fmt(entrataImporto(e))}</Td>
+                        <Td><Button variant="ghost" size="sm" onClick={() => deleteEntrata(e.id)}><Trash2 className="w-4 h-4 text-red-400" /></Button></Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              </CardContent></Card>
+            }
+            <div className="mt-2 flex items-start gap-2 text-xs text-gray-400 bg-blue-50 rounded-lg p-3">
+              <Info className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+              I movimenti di cassa taggati come <strong>ricorrenti</strong> vengono inclusi automaticamente nel cruscotto. Aggiungi qui solo entrate ricorrenti non ancora presenti in cassa.
             </div>
-          )}
+          </div>
         </div>
       )}
 
       {/* ──────────── TAB: OBIETTIVI ──────────── */}
       {activeTab === 'obiettivi' && (
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <p className="text-sm text-gray-500">Obiettivi finanziari ordinati per priorità, calcolati sul netto previsto</p>
-            <Button onClick={() => { setOf(emptyO); setAddObiettivo(true) }}>
-              <Plus className="w-4 h-4 mr-2" />Aggiungi Obiettivo
-            </Button>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-500">Obiettivi di spesa da raggiungere nel tempo (es. acquisto trattore). Il sistema distribuisce il surplus annuo proporzionalmente alla priorità %.</p>
+            <Button onClick={() => { setOf(emptyO); setAddObiettivo(true) }}><Plus className="w-4 h-4 mr-2" />Aggiungi Obiettivo</Button>
           </div>
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <Thead>
-                  <Tr><Th className="w-12">Prio.</Th><Th>Nome</Th><Th>Tipo</Th><Th>Target</Th><Th className="text-right">Importo target</Th><Th className="w-20">Azioni</Th></Tr>
-                </Thead>
-                <Tbody>
-                  {obiettivi.map(ob => {
-                    const importoTarget = ob.importoFisso !== null
-                      ? ob.importoFisso
-                      : nettoStimato * (ob.percentuale ?? 0) / 100
-                    return (
-                      <Tr key={ob.id}>
-                        <Td className="text-center font-mono text-gray-500">{ob.priorita}</Td>
-                        <Td className="font-medium">{ob.nome}</Td>
-                        <Td className="text-sm text-gray-600">{TIPI_OBIETTIVO.find(t => t.value === ob.tipo)?.label ?? ob.tipo}</Td>
-                        <Td className="text-sm text-gray-500">
-                          {ob.percentuale !== null ? `${ob.percentuale}% del netto` : 'Importo fisso'}
-                        </Td>
-                        <Td className="text-right font-medium text-indigo-600">{fmt(importoTarget)}</Td>
-                        <Td>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEditObiettivo(ob)}><Pencil className="w-4 h-4" /></Button>
-                            <Button variant="ghost" size="sm" onClick={() => deleteObiettivo(ob.id)}><Trash2 className="w-4 h-4 text-red-400" /></Button>
-                          </div>
-                        </Td>
-                      </Tr>
-                    )
-                  })}
-                  {obiettivi.length === 0 && <Tr><Td colSpan={6} className="text-center text-gray-400 py-8">Nessun obiettivo definito</Td></Tr>}
-                </Tbody>
-              </Table>
-            </CardContent>
-          </Card>
-          {obiettivi.length > 0 && (
-            <Card className="mt-4">
-              <CardContent className="p-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Allocazione del netto previsto ({fmt(nettoStimato)})</p>
-                {(() => {
-                  let rimanente = nettoStimato
-                  return obiettivi.map(ob => {
-                    const target = ob.importoFisso !== null ? ob.importoFisso : nettoStimato * (ob.percentuale ?? 0) / 100
-                    const coperto = Math.min(target, Math.max(0, rimanente))
-                    rimanente -= coperto
-                    const pct = target > 0 ? (coperto / target) * 100 : 100
-                    return (
-                      <div key={ob.id} className="flex items-center gap-3 py-1.5 border-b border-gray-100 last:border-0">
-                        <span className="text-xs text-gray-500 w-4">{ob.priorita}</span>
-                        <span className="text-sm flex-1">{ob.nome}</span>
-                        <span className="text-sm font-medium">{fmt(target)}</span>
-                        <div className="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${pct >= 100 ? 'bg-green-500' : pct > 0 ? 'bg-amber-400' : 'bg-red-300'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
-                        </div>
+          <Card><CardContent className="p-0">
+            <Table>
+              <Thead><Tr><Th>Nome</Th><Th>Categoria</Th><Th className="text-right">Importo target</Th><Th className="text-right">Priorità %</Th><Th className="w-20">Azioni</Th></Tr></Thead>
+              <Tbody>
+                {obiettivi.map(ob => (
+                  <Tr key={ob.id}>
+                    <Td className="font-medium">{ob.nome}</Td>
+                    <Td><Badge variant="default">{ob.categoria}</Badge></Td>
+                    <Td className="text-right font-medium text-indigo-600">{fmt(ob.importoTarget)}</Td>
+                    <Td className="text-right">
+                      <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-700">
+                        <Target className="w-3.5 h-3.5" />{ob.percentualePriorita}%
+                      </span>
+                    </Td>
+                    <Td>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEditObiettivo(ob)}><Pencil className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => deleteObiettivo(ob.id)}><Trash2 className="w-4 h-4 text-red-400" /></Button>
                       </div>
-                    )
-                  })
-                })()}
-                {(() => {
-                  const allocato = obiettivi.reduce((s, ob) => s + (ob.importoFisso !== null ? ob.importoFisso : nettoStimato * (ob.percentuale ?? 0) / 100), 0)
-                  const residuo = nettoStimato - allocato
-                  return <p className="text-xs text-gray-500 mt-2">Residuo non allocato: <span className={residuo >= 0 ? 'text-green-600' : 'text-red-500'}>{fmt(residuo)}</span></p>
-                })()}
-              </CardContent>
-            </Card>
+                    </Td>
+                  </Tr>
+                ))}
+                {obiettivi.length === 0 && <Tr><Td colSpan={5} className="text-center text-gray-400 py-8">Nessun obiettivo di spesa definito</Td></Tr>}
+              </Tbody>
+            </Table>
+          </CardContent></Card>
+          {obiettivi.length > 0 && (
+            <div className="bg-amber-50 rounded-lg p-3 text-xs text-amber-700 flex items-start gap-2">
+              <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              Totale priorità assegnata: <strong>{obiettivi.reduce((s, o) => s + o.percentualePriorita, 0)}%</strong> del surplus annuo. Vai al <button className="underline font-medium" onClick={() => setActiveTab('cruscotto')}>Cruscotto</button> per vedere la distribuzione per anno.
+            </div>
           )}
         </div>
       )}
 
       {/* ──────────── TAB: CRUSCOTTO ──────────── */}
       {activeTab === 'cruscotto' && (
-        <div>
+        <div className="space-y-6">
           {!cruscotto ? (
-            <div className="text-center py-12 text-gray-400">
-              <p>Caricamento dati cruscotto...</p>
-            </div>
+            <div className="text-center py-12 text-gray-400">Caricamento cruscotto...</div>
           ) : (
-            <div className="space-y-6">
-              {/* totale cards */}
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Previsionale ({scenario.annoInizio}–{scenario.annoFine})</p>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-sm"><span className="text-gray-600">Entrate</span><span className="text-green-600 font-medium">{fmt(cruscotto.totale.entratePreviste)}</span></div>
-                      <div className="flex justify-between text-sm"><span className="text-gray-600">Uscite</span><span className="text-red-500 font-medium">{fmt(cruscotto.totale.uscitePreviste)}</span></div>
-                      <div className="flex justify-between text-sm font-semibold border-t pt-1"><span>Netto</span><span className={cruscotto.totale.nettoPrevisto >= 0 ? 'text-indigo-600' : 'text-red-600'}>{fmt(cruscotto.totale.nettoPrevisto)}</span></div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Reale (movimenti cassa)</p>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-sm"><span className="text-gray-600">Entrate</span><span className="text-green-600 font-medium">{fmt(cruscotto.totale.entratoReale)}</span></div>
-                      <div className="flex justify-between text-sm"><span className="text-gray-600">Uscite</span><span className="text-red-500 font-medium">{fmt(cruscotto.totale.usciteReali)}</span></div>
-                      <div className="flex justify-between text-sm font-semibold border-t pt-1"><span>Netto</span><span className={cruscotto.totale.nettoReale >= 0 ? 'text-indigo-600' : 'text-red-600'}>{fmt(cruscotto.totale.nettoReale)}</span></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* per-anno table */}
-              {cruscotto.anni.length > 0 && (
-                <Card>
-                  <CardContent className="p-0">
-                    <div className="p-4 border-b"><p className="font-medium text-sm text-gray-700">Confronto per anno</p></div>
-                    <Table>
-                      <Thead>
-                        <Tr>
-                          <Th>Anno</Th>
-                          <Th className="text-right">Entrate prev.</Th>
-                          <Th className="text-right">Uscite prev.</Th>
-                          <Th className="text-right">Netto prev.</Th>
-                          <Th className="text-right">Entrate reali</Th>
-                          <Th className="text-right">Uscite reali</Th>
-                          <Th className="text-right">Netto reale</Th>
-                          <Th className="text-right">Scostamento</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {cruscotto.perAnno.map(a => (
-                          <Tr key={a.anno}>
-                            <Td><Badge variant="default">{a.anno}</Badge></Td>
-                            <Td className="text-right text-green-600">{fmt(a.entratePreviste)}</Td>
-                            <Td className="text-right text-red-500">{fmt(a.uscitePreviste)}</Td>
-                            <Td className={`text-right font-medium ${a.nettoPrevisto >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>{fmt(a.nettoPrevisto)}</Td>
-                            <Td className="text-right text-green-600">{fmt(a.entratoReale)}</Td>
-                            <Td className="text-right text-red-500">{fmt(a.usciteReali)}</Td>
-                            <Td className={`text-right font-medium ${a.nettoReale >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>{fmt(a.nettoReale)}</Td>
-                            <Td className={`text-right font-semibold ${a.scostamentoNetto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {a.scostamentoNetto !== 0 ? (a.scostamentoNetto > 0 ? <TrendingUp className="w-3 h-3 inline mr-1" /> : <TrendingDown className="w-3 h-3 inline mr-1" />) : null}
-                              {sign(a.scostamentoNetto)}
-                            </Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>
-                  </CardContent>
-                </Card>
+            <>
+              {/* Movimenti cassa ricorrenti inclusi */}
+              {cruscotto.movimentiRicorrentiCassa.count > 0 && (
+                <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 flex items-start gap-2">
+                  <Repeat2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    Inclusi automaticamente <strong>{cruscotto.movimentiRicorrentiCassa.count}</strong> movimenti cassa ricorrenti:
+                    entrate {fmt(cruscotto.movimentiRicorrentiCassa.entrate)}/anno,
+                    uscite {fmt(cruscotto.movimentiRicorrentiCassa.uscite)}/anno.
+                    Questi si sommano ogni anno del piano.
+                  </span>
+                </div>
               )}
 
-              {/* obiettivi status */}
+              {/* Totale */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card><CardContent className="p-4">
+                  <p className="text-xs text-gray-500 mb-1">Entrate totali piano</p>
+                  <p className="text-xl font-bold text-green-600">{fmt(cruscotto.totale.totEntrate)}</p>
+                </CardContent></Card>
+                <Card><CardContent className="p-4">
+                  <p className="text-xs text-gray-500 mb-1">Uscite totali piano</p>
+                  <p className="text-xl font-bold text-red-500">{fmt(cruscotto.totale.totUscite)}</p>
+                </CardContent></Card>
+                <Card><CardContent className="p-4">
+                  <p className="text-xs text-gray-500 mb-1">Surplus disponibile</p>
+                  <p className={`text-xl font-bold ${cruscotto.totale.surplus >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>{fmt(cruscotto.totale.surplus)}</p>
+                </CardContent></Card>
+              </div>
+
+              {/* Per anno */}
+              <Card><CardContent className="p-0">
+                <div className="p-4 border-b"><p className="font-medium text-sm text-gray-700">Previsione per anno</p></div>
+                <Table>
+                  <Thead>
+                    <Tr>
+                      <Th>Anno</Th>
+                      <Th className="text-right">Entrate</Th>
+                      <Th className="text-right">Uscite</Th>
+                      <Th className="text-right">Surplus</Th>
+                      <Th className="text-right">Allocato obiettivi</Th>
+                      <Th className="text-right">Residuo</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {cruscotto.perAnno.map(a => (
+                      <Tr key={a.anno}>
+                        <Td><Badge variant="default">{a.anno}</Badge></Td>
+                        <Td className="text-right text-green-600">{fmt(a.totEntrate)}</Td>
+                        <Td className="text-right text-red-500">{fmt(a.totUscite)}</Td>
+                        <Td className={`text-right font-medium ${a.surplus >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>{fmt(a.surplus)}</Td>
+                        <Td className="text-right text-amber-700">{fmt(a.allocatoObiettivi)}</Td>
+                        <Td className={`text-right font-medium ${a.residuo >= 0 ? 'text-gray-700' : 'text-red-600'}`}>{fmt(a.residuo)}</Td>
+                      </Tr>
+                    ))}
+                    <Tr className="bg-gray-50 font-semibold">
+                      <Td>Totale</Td>
+                      <Td className="text-right text-green-600">{fmt(cruscotto.totale.totEntrate)}</Td>
+                      <Td className="text-right text-red-500">{fmt(cruscotto.totale.totUscite)}</Td>
+                      <Td className={`text-right ${cruscotto.totale.surplus >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>{fmt(cruscotto.totale.surplus)}</Td>
+                      <Td className="text-right text-amber-700">{fmt(cruscotto.totale.allocatoObiettivi)}</Td>
+                      <Td className={`text-right ${cruscotto.totale.residuo >= 0 ? 'text-gray-700' : 'text-red-600'}`}>{fmt(cruscotto.totale.residuo)}</Td>
+                    </Tr>
+                  </Tbody>
+                </Table>
+              </CardContent></Card>
+
+              {/* Obiettivi progress */}
               {cruscotto.obiettivi.length > 0 && (
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="font-medium text-sm text-gray-700 mb-4">Stato obiettivi (sul netto reale)</p>
-                    <div className="space-y-3">
-                      {cruscotto.obiettivi.map(ob => (
-                        <div key={ob.id} className="flex items-center gap-3">
+                <Card><CardContent className="p-4">
+                  <p className="font-medium text-sm text-gray-700 mb-4">Progressione obiettivi di spesa</p>
+                  <div className="space-y-5">
+                    {cruscotto.obiettivi.map(ob => (
+                      <div key={ob.id}>
+                        <div className="flex items-center gap-2 mb-1">
                           {ob.stato === 'raggiunto'
-                            ? <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                            ? <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
                             : ob.stato === 'parziale'
-                            ? <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
-                            : <Clock className="w-5 h-5 text-red-400 shrink-0" />}
-                          <div className="flex-1">
-                            <div className="flex justify-between text-sm">
-                              <span className="font-medium">{ob.nome}</span>
-                              <span className="text-gray-500">{fmt(ob.importoCoperto)} / {fmt(ob.importoTarget)}</span>
-                            </div>
-                            <div className="w-full h-2 bg-gray-100 rounded-full mt-1 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${ob.stato === 'raggiunto' ? 'bg-green-500' : ob.stato === 'parziale' ? 'bg-amber-400' : 'bg-red-300'}`}
-                                style={{ width: `${Math.min(ob.percentualeCoperta, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                          <span className={`text-sm font-medium ${ob.stato === 'raggiunto' ? 'text-green-600' : ob.stato === 'parziale' ? 'text-amber-600' : 'text-red-500'}`}>
+                              ? <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                              : <Clock className="w-4 h-4 text-red-400 shrink-0" />}
+                          <span className="font-medium text-sm flex-1">{ob.nome}</span>
+                          <Badge variant="default" className="text-[10px]">{ob.categoria}</Badge>
+                          <span className="text-xs text-gray-500">{ob.percentualePriorita}% surplus</span>
+                          <span className="text-sm font-semibold text-gray-700">{fmt(ob.totalAllocato)} / {fmt(ob.importoTarget)}</span>
+                          <span className={`text-sm font-bold ml-2 ${ob.stato === 'raggiunto' ? 'text-green-600' : ob.stato === 'parziale' ? 'text-amber-600' : 'text-red-500'}`}>
                             {Math.round(ob.percentualeCoperta)}%
                           </span>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden mb-2">
+                          <div className={`h-full rounded-full ${ob.stato === 'raggiunto' ? 'bg-green-500' : ob.stato === 'parziale' ? 'bg-amber-400' : 'bg-red-300'}`}
+                            style={{ width: `${Math.min(ob.percentualeCoperta, 100)}%` }} />
+                        </div>
+                        {ob.allocazionePerAnno.some(x => x.allocato > 0) && (
+                          <div className="flex gap-2 flex-wrap">
+                            {ob.allocazionePerAnno.filter(x => x.allocato > 0).map(x => (
+                              <span key={x.anno} className="text-[10px] bg-amber-50 text-amber-700 rounded px-1.5 py-0.5">
+                                {x.anno}: {fmt(x.allocato)}
+                              </span>
+                            ))}
+                            {ob.annoCompletamento && (
+                              <span className="text-[10px] bg-green-50 text-green-700 rounded px-1.5 py-0.5 font-medium">
+                                completato entro {ob.annoCompletamento}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent></Card>
               )}
-            </div>
+            </>
           )}
         </div>
       )}
@@ -666,14 +635,8 @@ export default function ScenarioDetailPage() {
       {/* Edit scenario */}
       <Modal open={editScenario} onClose={() => setEditScenario(false)} title="Modifica Scenario">
         <form onSubmit={handleEditScenario} className="space-y-4">
-          <div>
-            <label className="text-sm font-medium block mb-1">Nome *</label>
-            <Input value={editSf.nome} onChange={e => setEditSf({ ...editSf, nome: e.target.value })} required />
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Descrizione</label>
-            <Input value={editSf.descrizione} onChange={e => setEditSf({ ...editSf, descrizione: e.target.value })} />
-          </div>
+          <div><label className="text-sm font-medium block mb-1">Nome *</label><Input value={editSf.nome} onChange={e => setEditSf({ ...editSf, nome: e.target.value })} required /></div>
+          <div><label className="text-sm font-medium block mb-1">Descrizione</label><Input value={editSf.descrizione} onChange={e => setEditSf({ ...editSf, descrizione: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="text-sm font-medium block mb-1">Anno inizio</label><Input type="number" value={editSf.annoInizio} onChange={e => setEditSf({ ...editSf, annoInizio: e.target.value })} /></div>
             <div><label className="text-sm font-medium block mb-1">Anno fine</label><Input type="number" value={editSf.annoFine} onChange={e => setEditSf({ ...editSf, annoFine: e.target.value })} /></div>
@@ -694,28 +657,43 @@ export default function ScenarioDetailPage() {
       {/* Add uscita */}
       <Modal open={addUscita} onClose={() => { setAddUscita(false); setUf(emptyU) }} title="Aggiungi Uscita">
         <form onSubmit={handleAddUscita} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium block mb-1">Tipo di uscita</label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setUf({ ...uf, tipologia: 'corrente' })}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border ${uf.tipologia === 'corrente' ? 'bg-red-50 border-red-300 text-red-700' : 'bg-white border-gray-200 text-gray-500'}`}>
+                Corrente (un anno)
+              </button>
+              <button type="button" onClick={() => setUf({ ...uf, tipologia: 'ricorrente', anno: '' })}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border flex items-center justify-center gap-1 ${uf.tipologia === 'ricorrente' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-gray-200 text-gray-500'}`}>
+                <Repeat2 className="w-3.5 h-3.5" />Ricorrente (ogni anno)
+              </button>
+            </div>
+          </div>
+          {uf.tipologia === 'corrente' && (
             <div>
               <label className="text-sm font-medium block mb-1">Anno *</label>
               <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={uf.anno} onChange={e => setUf({ ...uf, anno: e.target.value })} required>
                 <option value="">Seleziona...</option>
-                {annoList.map(a => <option key={a} value={a}>{a}</option>)}
+                {anni.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium block mb-1">Categoria *</label>
               <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={uf.categoria} onChange={e => setUf({ ...uf, categoria: e.target.value })}>
                 {CATEGORIE_USCITA.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Importo (€) *</label>
+              <Input type="number" step="0.01" min={0} value={uf.importo} onChange={e => setUf({ ...uf, importo: e.target.value })} placeholder="5000" required />
+            </div>
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">Descrizione *</label>
-            <Input value={uf.descrizione} onChange={e => setUf({ ...uf, descrizione: e.target.value })} placeholder="Es. Potatura oliveto Santa Venerina" required />
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Importo (€) *</label>
-            <Input type="number" step="0.01" min={0} value={uf.importo} onChange={e => setUf({ ...uf, importo: e.target.value })} placeholder="5000" required />
+            <Input value={uf.descrizione} onChange={e => setUf({ ...uf, descrizione: e.target.value })} placeholder="Es. Potatura oliveto" required />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -726,19 +704,14 @@ export default function ScenarioDetailPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium block mb-1">Terreno / Stacco</label>
+              <label className="text-sm font-medium block mb-1">Terreno</label>
               <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={uf.terrenoId} onChange={e => setUf({ ...uf, terrenoId: e.target.value })}>
                 <option value="">Tutti / nessuno</option>
-                {terreni
-                  .filter(t => !uf.luogoId || String(t.luogoId) === uf.luogoId)
-                  .map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                {terreni.filter(t => !uf.luogoId || String(t.luogoId) === uf.luogoId).map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
               </select>
             </div>
           </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Note</label>
-            <Input value={uf.note} onChange={e => setUf({ ...uf, note: e.target.value })} />
-          </div>
+          <div><label className="text-sm font-medium block mb-1">Note</label><Input value={uf.note} onChange={e => setUf({ ...uf, note: e.target.value })} /></div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => { setAddUscita(false); setUf(emptyU) }}>Annulla</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Aggiungi Uscita'}</Button>
@@ -749,38 +722,50 @@ export default function ScenarioDetailPage() {
       {/* Add entrata */}
       <Modal open={addEntrata} onClose={() => { setAddEntrata(false); setEf(emptyE); setPrezzoMedioHint(null) }} title="Aggiungi Entrata">
         <form onSubmit={handleAddEntrata} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium block mb-1">Natura entrata</label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setEf({ ...ef, naturaTipo: 'stimata' })}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border ${ef.naturaTipo === 'stimata' ? 'bg-green-50 border-green-300 text-green-700' : 'bg-white border-gray-200 text-gray-500'}`}>
+                Stimata (un anno)
+              </button>
+              <button type="button" onClick={() => setEf({ ...ef, naturaTipo: 'ricorrente', anno: '' })}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border flex items-center justify-center gap-1 ${ef.naturaTipo === 'ricorrente' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-gray-200 text-gray-500'}`}>
+                <Repeat2 className="w-3.5 h-3.5" />Ricorrente (ogni anno)
+              </button>
+            </div>
+          </div>
+          {ef.naturaTipo === 'stimata' && (
             <div>
               <label className="text-sm font-medium block mb-1">Anno *</label>
               <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={ef.anno} onChange={e => setEf({ ...ef, anno: e.target.value })} required>
                 <option value="">Seleziona...</option>
-                {annoList.map(a => <option key={a} value={a}>{a}</option>)}
+                {anni.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
-            <div>
-              <label className="text-sm font-medium block mb-1">Tipo *</label>
-              <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={ef.tipo} onChange={e => setEf({ ...ef, tipo: e.target.value, prodottoId: '' })}>
-                {TIPI_ENTRATA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
+          )}
+          <div>
+            <label className="text-sm font-medium block mb-1">Tipo *</label>
+            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={ef.tipo} onChange={e => setEf({ ...ef, tipo: e.target.value, prodottoId: '' })}>
+              {TIPI_ENTRATA.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">Descrizione *</label>
-            <Input value={ef.descrizione} onChange={e => setEf({ ...ef, descrizione: e.target.value })} placeholder="Es. Vendita olio Santa Venerina 2025" required />
+            <Input value={ef.descrizione} onChange={e => setEf({ ...ef, descrizione: e.target.value })} placeholder="Es. Vendita olio Santa Venerina" required />
           </div>
-
           {ef.tipo === 'produzione' ? (
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium block mb-1">Prodotto *</label>
                   <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={ef.prodottoId} onChange={e => setEf({ ...ef, prodottoId: e.target.value })} required>
-                    <option value="">Seleziona prodotto...</option>
+                    <option value="">Seleziona...</option>
                     {prodotti.map(p => <option key={p.id} value={p.id}>{p.codice} – {p.nome}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium block mb-1">Terreno / Stacco</label>
+                  <label className="text-sm font-medium block mb-1">Terreno</label>
                   <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={ef.terrenoId} onChange={e => setEf({ ...ef, terrenoId: e.target.value })}>
                     <option value="">Tutti / nessuno</option>
                     {terreni.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
@@ -812,11 +797,7 @@ export default function ScenarioDetailPage() {
               <Input type="number" step="0.01" min={0} value={ef.importoFisso} onChange={e => setEf({ ...ef, importoFisso: e.target.value })} placeholder="Es. 15000" required />
             </div>
           )}
-
-          <div>
-            <label className="text-sm font-medium block mb-1">Note</label>
-            <Input value={ef.note} onChange={e => setEf({ ...ef, note: e.target.value })} />
-          </div>
+          <div><label className="text-sm font-medium block mb-1">Note</label><Input value={ef.note} onChange={e => setEf({ ...ef, note: e.target.value })} /></div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => { setAddEntrata(false); setEf(emptyE); setPrezzoMedioHint(null) }}>Annulla</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Aggiungi Entrata'}</Button>
@@ -825,12 +806,12 @@ export default function ScenarioDetailPage() {
       </Modal>
 
       {/* Add obiettivo */}
-      <Modal open={addObiettivo} onClose={() => { setAddObiettivo(false); setOf(emptyO) }} title="Aggiungi Obiettivo">
+      <Modal open={addObiettivo} onClose={() => { setAddObiettivo(false); setOf(emptyO) }} title="Aggiungi Obiettivo di Spesa">
         <ObiettivoForm onSubmit={handleAddObiettivo} submitLabel="Aggiungi Obiettivo" />
       </Modal>
 
       {/* Edit obiettivo */}
-      <Modal open={!!editObiettivo} onClose={() => { setEditObiettivo(null); setOf(emptyO) }} title="Modifica Obiettivo">
+      <Modal open={!!editObiettivoModal} onClose={() => { setEditObiettivoModal(null); setOf(emptyO) }} title="Modifica Obiettivo">
         <ObiettivoForm onSubmit={handleEditObiettivo} submitLabel="Aggiorna Obiettivo" />
       </Modal>
     </div>
