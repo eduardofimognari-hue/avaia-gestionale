@@ -177,8 +177,9 @@ async function buildContesto(aziendaId: number): Promise<string> {
     else giacenzeMap[n].scarico += m.quantita
   }
 
-  const fmt = (n: number) => n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })
-  const fmtN = (n: number, um = '') => `${n.toLocaleString('it-IT', { maximumFractionDigits: 2 })}${um ? ' ' + um : ''}`
+  const toNum = (v: unknown): number => (v == null ? 0 : Number(v))
+  const fmt = (n: unknown) => toNum(n).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })
+  const fmtN = (n: unknown, um = '') => `${toNum(n).toLocaleString('it-IT', { maximumFractionDigits: 2 })}${um ? ' ' + um : ''}`
 
   const contesto = `
 === DATA ODIERNA: ${oggi.toLocaleDateString('it-IT')} | ANNO CORRENTE: ${annoCorrente} ===
@@ -304,7 +305,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Domanda vuota' }, { status: 400 })
     }
 
-    const contesto = await buildContesto(aziendaId)
+    let contesto: string
+    try {
+      contesto = await buildContesto(aziendaId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.stack ?? err.message : String(err)
+      console.error('buildContesto error:', msg)
+      return NextResponse.json({ error: `Errore lettura dati: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 })
+    }
 
     const contents = [
       { role: 'user', parts: [{ text: `Ecco i dati aggiornati del gestionale:\n\n${contesto}` }] },
