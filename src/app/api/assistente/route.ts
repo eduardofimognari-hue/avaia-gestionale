@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db'
+﻿import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { withAzienda } from '@/lib/api-utils'
 
@@ -304,7 +304,7 @@ ${scenari.length === 0 ? '  Nessuno scenario' : scenari.map(s => {
 export async function POST(req: Request) {
   return withAzienda(async (aziendaId) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY
+      const apiKey = (process.env.GEMINI_API_KEY ?? '').replace(/[^\x20-\x7E]/g, '').trim()
       if (!apiKey) {
         return NextResponse.json(
           { error: 'Chiave API Gemini non configurata. Aggiungi GEMINI_API_KEY su Vercel.' },
@@ -371,3 +371,4 @@ export async function POST(req: Request) {
     }
   })
 }
+
