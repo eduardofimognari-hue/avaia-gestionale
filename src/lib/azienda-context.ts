@@ -9,9 +9,8 @@ export async function getCurrentAziendaId(): Promise<number | null> {
   if (id) {
     const aziendaId = parseInt(id)
     const utente = await getCurrentUser()
-    if (utente && utente.aziendaId !== aziendaId) {
-      return utente.aziendaId
-    }
+    if (!utente) return null
+    if (utente.aziendaId !== aziendaId) return utente.aziendaId
     return aziendaId
   }
 

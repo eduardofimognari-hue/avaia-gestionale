@@ -18,7 +18,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const data: Record<string, unknown> = {}
     if (nome !== undefined) data.nome = nome
     if (email !== undefined) data.email = email
-    if (ruolo !== undefined) data.ruolo = ruolo
+    if (ruolo !== undefined) {
+      if (!['admin', 'editor'].includes(ruolo)) return NextResponse.json({ error: 'Ruolo non valido' }, { status: 400 })
+      data.ruolo = ruolo
+    }
     if (attivo !== undefined) data.attivo = attivo
     if (password) data.password = await bcrypt.hash(password, 10)
     const utente = await prisma.utente.update({

@@ -32,10 +32,8 @@ export async function POST(request: Request) {
     const exists = await prisma.utente.findUnique({ where: { email: parsed.email } })
     if (exists) return NextResponse.json({ error: 'Email già registrata' }, { status: 409 })
     const hashed = await bcrypt.hash(parsed.password, 10)
-    const firstAzienda = await prisma.azienda.findFirst({ where: { attivo: true } })
-    if (!firstAzienda) return NextResponse.json({ error: 'Nessuna azienda disponibile' }, { status: 400 })
     const utente = await prisma.utente.create({
-      data: { email: parsed.email, nome: parsed.nome, password: hashed, ruolo: parsed.ruolo || 'editor', aziendaId: firstAzienda.id },
+      data: { email: parsed.email, nome: parsed.nome, password: hashed, ruolo: parsed.ruolo || 'editor', aziendaId: aziendaId! },
       select: { id: true, email: true, nome: true, ruolo: true, attivo: true, aziendaId: true },
     })
     return NextResponse.json(utente, { status: 201 })

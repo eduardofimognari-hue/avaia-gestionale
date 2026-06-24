@@ -65,10 +65,12 @@ export default function LoginPage() {
             className="w-full h-11 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 shadow-lg shadow-primary-200 transition-all">
             {loading ? 'Accesso in corso...' : pageReady ? 'Accedi' : 'Caricamento...'}
           </Button>
-          <div className="text-[11px] text-gray-300 text-center space-y-0.5">
-            <p>admin: admin@avaia.it / avaia-demo</p>
-            <p>editor: editor@avaia.it / editor-demo</p>
-          </div>
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-[11px] text-gray-300 text-center space-y-0.5">
+              <p>admin: admin@avaia.it / avaia-demo</p>
+              <p>editor: editor@avaia.it / editor-demo</p>
+            </div>
+          )}
         </form>
       </div>
     </div>

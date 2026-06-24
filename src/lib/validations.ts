@@ -187,7 +187,7 @@ export const utenteSchema = z.object({
   email: z.string().email('Email non valida'),
   nome: z.string().min(1, 'Nome obbligatorio'),
   password: z.string().min(6, 'Password almeno 6 caratteri'),
-  ruolo: z.string().optional().default('editor'),
+  ruolo: z.enum(['admin', 'editor']).optional().default('editor'),
 })
 
 // ─── Schema PATCH (aggiornamento parziale) ───────────────────────────────────

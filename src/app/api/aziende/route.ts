@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/db'
+import { authOptions } from '@/lib/auth'
 import { getCurrentAziendaId } from '@/lib/azienda-context'
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
     const aziende = await prisma.azienda.findMany({ where: { attivo: true }, orderBy: { nome: 'asc' } })
     const currentId = await getCurrentAziendaId()
     const current = currentId ? aziende.find(a => a.id === currentId) || aziende[0] : aziende[0]
