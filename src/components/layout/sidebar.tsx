@@ -1,6 +1,6 @@
 'use client'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, Landmark, ShoppingCart, Euro, Receipt, Hammer, Sprout, Warehouse, MapPin, FileText, Shield, LogOut, X, Menu, BarChart3, Wallet, TrendingUp, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Users, Landmark, ShoppingCart, Euro, Receipt, Hammer, Sprout, Warehouse, MapPin, FileText, Shield, LogOut, X, Menu, BarChart3, Wallet, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -48,12 +48,6 @@ const groups: { title: string; items: NavItem[] }[] = [
     title: 'Grafici e Statistiche',
     items: [
       { label: 'Statistiche', icon: BarChart3, href: '/statistiche', color: 'text-indigo-600' },
-    ],
-  },
-  {
-    title: 'Assistente AI',
-    items: [
-      { label: 'Assistente', icon: Sparkles, href: '/assistente', color: 'text-violet-600' },
     ],
   },
 ]
